@@ -6,7 +6,6 @@ puppeteer.use(StealthPlugin());
 // গিটহাব ইনপুট বা ডিফল্ট ১০ জন ভিজিটর
 const TOTAL_VISITORS = parseInt(process.env.VISITOR_COUNT) || 10;
 
-// বিভিন্ন ডিভাইসের User-Agent তালিকা
 const USER_AGENTS = [
     'Mozilla/5.0 (Linux; Android 13; SM-S918B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Mobile Safari/537.36',
     'Mozilla/5.0 (iPhone; CPU iPhone OS 17_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.1 Mobile/15E148 Safari/604.1',
@@ -63,7 +62,7 @@ async function runSingleVisitor(visitorIndex) {
     try {
         console.log(`[Visitor ${visitorIndex + 1}] Visiting target URL with new IP...`);
         await page.goto('https://privatecallsms.blogspot.com/2026/11/zdf.html', { 
-            waitUntil: 'networkidle2',
+            waitUntil: 'networkidle0',
             timeout: 60000 
         });
 
@@ -78,20 +77,34 @@ async function runSingleVisitor(visitorIndex) {
             return;
         }
 
-        // স্ক্রিনশট ১: পেজে ঢোকার পর
-        await page.screenshot({ path: `visitor-${visitorIndex + 1}-step1-visited.png` });
+        // অ্যাড লোড হওয়ার সময় প্রতি ২ সেকেন্ডে স্ক্রিনশট (মোট ৬ সেকেন্ডে ৩টি)
+        console.log(`[Visitor ${visitorIndex + 1}] Taking screenshots every 2s while waiting for ads...`);
+        for (let s = 1; s <= 3; s++) {
+            await delay(2000);
+            await page.screenshot({ path: `visitor-${visitorIndex + 1}-load-2s-${s}.png`, fullPage: true });
+        }
 
-        // ১. ৫ সেকেন্ড স্ক্রোল
-        console.log(`[Visitor ${visitorIndex + 1}] Human-like scrolling (5s)...`);
-        await humanLikeScroll(page, 5000);
+        // মানবিকভাবে স্ক্রোল করার সময় প্রতি ২ সেকেন্ডে স্ক্রিনশট
+        console.log(`[Visitor ${visitorIndex + 1}] Human-like scrolling with screenshots every 2s...`);
+        for (let s = 1; s <= 3; s++) {
+            const scrollAmount = Math.floor(Math.random() * 200) + 100;
+            await page.evaluate((y) => window.scrollBy(0, y), scrollAmount);
+            await delay(2000);
+            await page.screenshot({ path: `visitor-${visitorIndex + 1}-scroll-2s-${s}.png`, fullPage: true });
+        }
 
-        // ২. "পড়া শুরু করুন" বাটনে ক্লিক
+        // লাল বাটনে ক্লিক
         console.log(`[Visitor ${visitorIndex + 1}] Clicking the red button...`);
-        await delay(Math.floor(Math.random() * 1500) + 500);
+        await delay(1000);
+
+        const newPagePromise = new Promise(resolve => browser.once('target', async target => {
+            const newPage = await target.page();
+            resolve(newPage);
+        }));
 
         const clicked = await page.evaluate(() => {
-            const elements = Array.from(document.querySelectorAll('a, button, div, span'));
-            const target = elements.find(el => el.textContent && el.textContent.includes('পড়া শুরু করুন'));
+            const allEls = Array.from(document.querySelectorAll('a, button, div, span'));
+            const target = allEls.find(el => el.textContent && el.textContent.includes('পড়া শুরু করুন'));
             if (target) {
                 target.click();
                 return true;
@@ -105,36 +118,42 @@ async function runSingleVisitor(visitorIndex) {
             console.log(`[Visitor ${visitorIndex + 1}] Red button not found.`);
         }
 
-        // স্ক্রিনশট ২: লাল বাটনে ক্লিক করার পরে
-        await page.screenshot({ path: `visitor-${visitorIndex + 1}-step2-clicked.png` });
+        // অ্যাড পেজ বা নতুন ট্যাবে গিয়ে প্রতি ২ সেকেন্ডে স্ক্রিনশট (মোট ১০ সেকেন্ডে ৫টি)
+        try {
+            const adPage = await Promise.race([
+                newPagePromise,
+                delay(3000).then(() => null)
+            ]);
 
-        // ৩. ক্লিকের পর আরও ৫ সেকেন্ড স্ক্রোল
-        console.log(`[Visitor ${visitorIndex + 1}] Post-click scrolling (5s)...`);
-        await humanLikeScroll(page, 5000);
+            if (adPage) {
+                console.log(`[Visitor ${visitorIndex + 1}] Ad page detected! Capturing screenshot every 2s for 10s...`);
+                await adPage.bringToFront();
+                
+                for (let s = 1; s <= 5; s++) {
+                    await delay(2000);
+                    await adPage.screenshot({ path: `visitor-${visitorIndex + 1}-ad-2s-${s}.png`, fullPage: true });
+                }
+            } else {
+                console.log(`[Visitor ${visitorIndex + 1}] Capturing screenshot every 2s on current page for 10s...`);
+                for (let s = 1; s <= 5; s++) {
+                    await delay(2000);
+                    await page.screenshot({ path: `visitor-${visitorIndex + 1}-page-2s-${s}.png`, fullPage: true });
+                }
+            }
+        } catch (e) {
+            console.log(`[Visitor ${visitorIndex + 1}] Ad timer notice:`, e.message);
+            for (let s = 1; s <= 5; s++) {
+                await delay(2000);
+                await page.screenshot({ path: `visitor-${visitorIndex + 1}-fallback-2s-${s}.png`, fullPage: true });
+            }
+        }
 
-        // স্ক্রিনশট ৩: সেশন শেষ হওয়ার ঠিক আগে
-        await page.screenshot({ path: `visitor-${visitorIndex + 1}-step3-finished.png` });
-
-        console.log(`[Visitor ${visitorIndex + 1}] Session completed!`);
+        console.log(`[Visitor ${visitorIndex + 1}] Session completed successfully!`);
 
     } catch (error) {
         console.error(`[Visitor ${visitorIndex + 1}] Error:`, error.message);
     } finally {
         await browser.close();
-    }
-}
-
-async function humanLikeScroll(page, durationMs) {
-    const startTime = Date.now();
-    while (Date.now() - startTime < durationMs) {
-        const scrollAmount = Math.floor(Math.random() * 200) + 100;
-        await page.evaluate((y) => window.scrollBy(0, y), scrollAmount);
-        await delay(Math.floor(Math.random() * 800) + 400);
-
-        if (Math.random() > 0.6) {
-            await page.evaluate(() => window.scrollBy(0, -80));
-            await delay(500);
-        }
     }
 }
 
