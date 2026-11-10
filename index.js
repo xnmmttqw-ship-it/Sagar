@@ -33,13 +33,13 @@ async function runSingleVisitor(visitorIndex) {
             '--disable-dev-shm-usage',
             '--disable-accelerated-2d-canvas',
             '--disable-gpu',
-            '--proxy-server=socks5://gw.dataimpulse.com:10000' // DataImpulse প্রক্সি
+            '--proxy-server=http://gw.dataimpulse.com:10000' // HTTP প্রক্সি ব্যবহার করা হয়েছে (এরর ফিক্সড)
         ]
     });
 
     const page = await browser.newPage();
 
-    // DataImpulse প্রক্সি ইউজারনেম ও পাসওয়ার্ড
+    // DataImpulse প্রক্সি ইউজারনেম ও পাসওয়ার্ড অথেন্টিকেশন
     await page.authenticate({
         username: '4903c5e423ff85d767de_gr',
         password: 'c0615eb1ff9d5fad'
@@ -58,7 +58,7 @@ async function runSingleVisitor(visitorIndex) {
             timeout: 60000 
         });
 
-        // "I am not a robot" বা ক্যাপচা পপআপ চেকিং
+        // "I am not a robot" বা ক্যাপচা পপআপ চেकिंग
         const isRobotPopup = await page.evaluate(() => {
             const text = document.body.innerText || '';
             return text.includes('I am not a robot') || text.includes('Verify you are human') || text.includes('cf-challenge');
