@@ -2,8 +2,8 @@ name: Run Puppeteer Bot
 
 on:
   schedule:
-    - cron: '*/30 * * * *' # প্রতি ৩০ মিনিট পর পর অটোমেটিক রান হবে
-  workflow_dispatch: # ম্যানুয়ালি রান করার বাটনও থাকবে
+    - cron: '*/30 * * * *' # প্রতি ৩০ মিনিট পরপর রান হবে
+  workflow_dispatch: # ম্যানুয়ালি রান করার বাটন
 
 jobs:
   build:
