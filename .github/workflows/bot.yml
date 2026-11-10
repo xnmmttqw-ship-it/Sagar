@@ -2,8 +2,13 @@ name: Run Puppeteer Bot
 
 on:
   schedule:
-    - cron: '*/30 * * * *' # প্রতি ৩০ মিনিট পরপর রান হবে
-  workflow_dispatch: # ম্যানুয়ালি রান করার বাটন
+    - cron: '*/30 * * * *'
+  workflow_dispatch:
+    inputs:
+      visitor_count:
+        description: 'কতগুলো ভিজিটর চালাতে চান?'
+        required: true
+        default: '10'
 
 jobs:
   build:
@@ -22,4 +27,6 @@ jobs:
         run: npm install
 
       - name: Run Bot Script
+        env:
+          VISITOR_COUNT: ${{ github.event.inputs.visitor_count || 10 }}
         run: node index.js
