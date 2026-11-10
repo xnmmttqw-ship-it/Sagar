@@ -1,10 +1,12 @@
 const puppeteer = require('puppeteer-extra');
 const StealthPlugin = require('puppeteer-extra-plugin-stealth');
 
-// স্টিলথ প্লাগইন এনাবল করা (যাতে ক্লাউডফ্লেয়ার বা রোবট পপআপ না আসে)
 puppeteer.use(StealthPlugin());
 
-// ১০টি ভিন্ন ডিভাইসের User-Agent তালিকা
+// গিটহাব ইনপুট বা ডিফল্ট ১০ জন ভিজিটর
+const TOTAL_VISITORS = parseInt(process.env.VISITOR_COUNT) || 10;
+
+// বিভিন্ন ডিভাইসের User-Agent তালিকা
 const USER_AGENTS = [
     'Mozilla/5.0 (Linux; Android 13; SM-S918B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Mobile Safari/537.36',
     'Mozilla/5.0 (iPhone; CPU iPhone OS 17_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.1 Mobile/15E148 Safari/604.1',
@@ -22,7 +24,9 @@ const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
 async function runSingleVisitor(visitorIndex) {
     console.log(`[Visitor ${visitorIndex + 1}] Starting session...`);
-    const randomUA = USER_AGENTS[visitorIndex % USER_AGENTS.length];
+    
+    // র‍্যান্ডম ইউজার-এজেন্ট সিলেক্ট
+    const randomUA = USER_AGENTS[Math.floor(Math.random() * USER_AGENTS.length)];
 
     const browser = await puppeteer.launch({
         headless: true,
@@ -33,15 +37,18 @@ async function runSingleVisitor(visitorIndex) {
             '--disable-dev-shm-usage',
             '--disable-accelerated-2d-canvas',
             '--disable-gpu',
-            '--proxy-server=http://gw.dataimpulse.com:10000' // HTTP প্রক্সি ব্যবহার করা হয়েছে (এরর ফিক্সড)
+            '--proxy-server=http://gw.dataimpulse.com:10000'
         ]
     });
 
     const page = await browser.newPage();
 
-    // DataImpulse প্রক্সি ইউজারনেম ও পাসওয়ার্ড অথেন্টিকেশন
+    // DataImpulse প্রক্সিতে সেশন আইডি দিয়ে ১০০% ইউনিক আইপি জেনারেট করা
+    const randomSessionId = Math.floor(Math.random() * 10000000);
+    const proxyUser = `4903c5e423ff85d767de_gr_session-${randomSessionId}`;
+
     await page.authenticate({
-        username: '4903c5e423ff85d767de_gr',
+        username: proxyUser,
         password: 'c0615eb1ff9d5fad'
     });
 
@@ -52,13 +59,13 @@ async function runSingleVisitor(visitorIndex) {
     });
 
     try {
-        console.log(`[Visitor ${visitorIndex + 1}] Visiting target URL...`);
+        console.log(`[Visitor ${visitorIndex + 1}] Visiting target URL with new IP...`);
         await page.goto('https://privatecallsms.blogspot.com/2026/11/zdf.html', { 
             waitUntil: 'networkidle2',
             timeout: 60000 
         });
 
-        // "I am not a robot" বা ক্যাপচা পপআপ চেकिंग
+        // "I am not a robot" বা ক্যাপচা পপআপ চেকিং
         const isRobotPopup = await page.evaluate(() => {
             const text = document.body.innerText || '';
             return text.includes('I am not a robot') || text.includes('Verify you are human') || text.includes('cf-challenge');
@@ -70,11 +77,11 @@ async function runSingleVisitor(visitorIndex) {
             return;
         }
 
-        // ১. মানুষের মতো ৫ সেকেন্ড স্ক্রোল
+        // ১. ৫ সেকেন্ড স্ক্রোল
         console.log(`[Visitor ${visitorIndex + 1}] Human-like scrolling (5s)...`);
         await humanLikeScroll(page, 5000);
 
-        // ২. লাল লেখায় ("পড়া শুরু করুন") ক্লিক করা
+        // ২. "পড়া শুরু করুন" বাটনে ক্লিক
         console.log(`[Visitor ${visitorIndex + 1}] Clicking the red button...`);
         await delay(Math.floor(Math.random() * 1500) + 500);
 
@@ -107,7 +114,7 @@ async function runSingleVisitor(visitorIndex) {
     }
 }
 
-// মানুষের মতো স্ক্রোলিং ফাংশন
+// স্ক্রোলিং ফাংশন
 async function humanLikeScroll(page, durationMs) {
     const startTime = Date.now();
     while (Date.now() - startTime < durationMs) {
@@ -122,18 +129,18 @@ async function humanLikeScroll(page, durationMs) {
     }
 }
 
-// ১০ জন ভিজিটর একসাথে রান করানো
-async function runTenVisitorsParallel() {
-    console.log("Starting batch of 10 stealth visitors with proxy...\n");
+// সমান্তরালভাবে ভিজিটর রান করানো
+async function runVisitorsParallel() {
+    console.log(`Starting batch of ${TOTAL_VISITORS} stealth visitors with unique IPs...\n`);
     const tasks = [];
     
-    for (let i = 0; i < 10; i++) {
+    for (let i = 0; i < TOTAL_VISITORS; i++) {
         tasks.push(runSingleVisitor(i));
         await delay(Math.floor(Math.random() * 1500) + 500);
     }
 
     await Promise.all(tasks);
-    console.log("\nAll 10 visitors finished their sessions.");
+    console.log(`\nAll ${TOTAL_VISITORS} visitors finished their sessions.`);
 }
 
-runTenVisitorsParallel();
+runVisitorsParallel();
