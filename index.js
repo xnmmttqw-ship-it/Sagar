@@ -38,20 +38,11 @@ async function runSingleVisitor(visitorIndex) {
             '--disable-infobars',
             '--window-position=0,0',
             '--ignore-certificate-errors',
-            '--user-data-dir=/tmp/chrome-user-data-' + Math.random() + '-' + Date.now(),
-            '--proxy-server=http://gw.dataimpulse.com:10000'
+            '--user-data-dir=/tmp/chrome-user-data-' + Math.random() + '-' + Date.now()
         ]
     });
 
     const page = await browser.newPage();
-
-    const randomSessionId = Math.floor(Math.random() * 10000000);
-    const proxyUser = `4903c5e423ff85d767de_gr_session-${randomSessionId}`;
-
-    await page.authenticate({
-        username: proxyUser,
-        password: 'c0615eb1ff9d5fad'
-    });
 
     await page.setUserAgent(randomUA);
     await page.setViewport({ 
@@ -60,7 +51,7 @@ async function runSingleVisitor(visitorIndex) {
     });
 
     try {
-        console.log(`[Visitor ${visitorIndex + 1}] Visiting target URL with new IP...`);
+        console.log(`[Visitor ${visitorIndex + 1}] Visiting target URL directly...`);
         await page.goto('https://auctionr.org/4/5a41eae4c9364b8088fd4ff777a02672', { 
             waitUntil: 'networkidle0',
             timeout: 60000 
@@ -72,7 +63,7 @@ async function runSingleVisitor(visitorIndex) {
         });
 
         if (isRobotPopup) {
-            console.log(`[Visitor ${visitorIndex + 1}] Robot/Proxy block detected! Skipping...`);
+            console.log(`[Visitor ${visitorIndex + 1}] Block/Captcha detected! Skipping...`);
             await browser.close();
             return;
         }
