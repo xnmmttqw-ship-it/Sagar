@@ -37,6 +37,10 @@ async function runSingleVisitor(visitorIndex) {
             '--disable-dev-shm-usage',
             '--disable-accelerated-2d-canvas',
             '--disable-gpu',
+            '--disable-infobars',
+            '--window-position=0,0',
+            '--ignore-certificate-errors',
+            '--user-data-dir=/tmp/chrome-user-data-' + Math.random() + '-' + Date.now(), // একাধিক ব্রাউজার কনফ্লিক্ট ও SingletonLock এরর ফিক্স করার জন্য
             '--proxy-server=http://gw.dataimpulse.com:10000'
         ]
     });
