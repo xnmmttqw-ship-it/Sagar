@@ -26,10 +26,15 @@ async function runSingleVisitor(visitorIndex) {
     
     const randomUA = USER_AGENTS[Math.floor(Math.random() * USER_AGENTS.length)];
 
+    // হিমালয়া প্রক্সি ইনফরমেশন এনভায়রনমেন্ট ভ্যারিয়েবল থেকে লোড করা হচ্ছে
+    const proxyHost = process.env.PROXY_HOST;
+    const proxyPort = process.env.PROXY_PORT;
+
     const browser = await puppeteer.launch({
         headless: true,
         executablePath: process.env.CHROME_BIN || '/usr/bin/google-chrome',
         args: [
+            proxyHost && proxyPort ? `--proxy-server=http://${proxyHost}:${proxyPort}` : '',
             '--no-sandbox',
             '--disable-setuid-sandbox',
             '--disable-dev-shm-usage',
@@ -39,10 +44,18 @@ async function runSingleVisitor(visitorIndex) {
             '--window-position=0,0',
             '--ignore-certificate-errors',
             '--user-data-dir=/tmp/chrome-user-data-' + Math.random() + '-' + Date.now()
-        ]
+        ].filter(Boolean)
     });
 
     const page = await browser.newPage();
+
+    // প্রক্সি ইউজারনেম ও পাসওয়ার্ড অথেন্টিকেশন হ্যান্ডেল করা
+    if (process.env.PROXY_USER && process.env.PROXY_PASS) {
+        await page.authenticate({
+            username: process.env.PROXY_USER,
+            password: process.env.PROXY_PASS
+        });
+    }
 
     await page.setUserAgent(randomUA);
     await page.setViewport({ 
@@ -51,7 +64,7 @@ async function runSingleVisitor(visitorIndex) {
     });
 
     try {
-        console.log(`[Visitor ${visitorIndex + 1}] Visiting target URL directly...`);
+        console.log(`[Visitor ${visitorIndex + 1}] Visiting target URL via Residential Proxy...`);
         await page.goto('https://auctionr.org/4/5a41eae4c9364b8088fd4ff777a02672', { 
             waitUntil: 'networkidle0',
             timeout: 60000 
@@ -139,7 +152,7 @@ async function runSingleVisitor(visitorIndex) {
 }
 
 async function runVisitorsInBatches() {
-    console.log(`Starting ${TOTAL_VISITORS} visitors with batch size of ${CONCURRENT_LIMIT}...\n`);
+    console.log(`Starting ${TOTAL_VISITORS} visitors with batch size of ${CONCURRENT_LIMIT} using Residential Proxies...\n`);
     
     for (let i = 0; i < TOTAL_VISITORS; i += CONCURRENT_LIMIT) {
         const batch = [];
