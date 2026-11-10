@@ -1,58 +1,92 @@
 const puppeteer = require('puppeteer-core');
 
-// ৫ থেকে ১০ সেকেন্ডের মধ্যে যেকোনো র্যান্ডম সময় সিলেক্ট করার ফাংশন
-function getRandomDelay(min, max) {
-    return Math.floor(Math.random() * (max - min + 1) + min) * 1000;
-}
-
 async function runBot() {
     console.log("Bot starting...");
+    
+    // ব্রাউজার লঞ্চ করা (গিটহাব অ্যাকশনস বা লিনাক্স এনভায়রনমেন্টের জন্য উপযুক্ত কনফিগারেশন)
+    const browser = await puppeteer.launch({
+        headless: true,
+        executablePath: process.env.CHROME_BIN || '/usr/bin/google-chrome',
+        args: [
+            '--no-sandbox',
+            '--disable-setuid-sandbox',
+            '--disable-dev-shm-usage',
+            '--disable-accelerated-2d-canvas',
+            '--disable-gpu'
+        ]
+    });
+
+    const page = await browser.newPage();
+    
+    // মোবাইল ভিউপোর্ট সেট করা (যাতে আপনার স্ক্রিনশটের মতো মোবাইল লেআউট বা লাল বাটনটি পারফেক্ট পায়)
+    await page.setViewport({ width: 375, height: 667 });
+
     try {
-        const browser = await puppeteer.launch({
-            executablePath: process.env.CHROME_PATH || '/usr/bin/google-chrome',
-            args: [
-                '--no-sandbox',
-                '--disable-setuid-sandbox',
-                '--disable-dev-shm-usage',
-                '--disable-accelerated-2d-canvas',
-                '--disable-gpu'
-            ],
-            headless: true
-        });
-
-        const page = await browser.newPage();
-        
-        // Professional User-Agent
-        await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36');
-        
         console.log("Visiting target URL...");
-        await page.goto('https://privatecallsms.blogspot.com/2026/11/zdf.html', {
+        // আপনার টার্গেট ব্লগ ইউআরএল
+        await page.goto('https://privatecallsms.blogspot.com/2026/11/zdf.html', { 
             waitUntil: 'networkidle2',
-            timeout: 60000
+            timeout: 60000 
         });
 
-        // পেজে ঢোকার পর ঠিক ১৫ সেকেন্ড অপেক্ষা করবে
-        console.log("Simulating engagement for 15 seconds...");
-        await new Promise(resolve => setTimeout(resolve, 15000));
+        // ১. পেজে ঢোকার পর প্রথম ৫ সেকেন্ড ওপর-নিচে স্ক্রোল করা
+        console.log("Scrolling for 5 seconds before click...");
+        await autoScroll(page, 5000);
 
-        await browser.close();
+        // ২. লাল লেখায় ("পড়া শুরু করুন") ক্লিক করা
+        console.log("Clicking the red button...");
+        const clicked = await page.evaluate(() => {
+            const elements = Array.from(document.querySelectorAll('a, button, div, span'));
+            const target = elements.find(el => el.textContent && el.textContent.includes('পড়া শুরু করুন'));
+            if (target) {
+                target.click();
+                return true;
+            }
+            return false;
+        });
+
+        if (clicked) {
+            console.log("Successfully clicked the red button!");
+        } else {
+            console.log("Red button not found, continuing...");
+        }
+
+        // ৩. ক্লিক করার পর আরও ৫ সেকেন্ড ওপর-নিচে স্ক্রোল করা
+        console.log("Scrolling for 5 seconds after click...");
+        await autoScroll(page, 5000);
+
         console.log("Session completed successfully.");
+
     } catch (error) {
         console.error("Error occurred:", error);
+    } finally {
+        await browser.close();
     }
 }
 
-// ইনফিনিট লুপ যেখানে প্রতি সেশনের মাঝে ৫ থেকে ১০ সেকেন্ডের র্যান্ডম বিরতি থাকবে
-async function startLoop() {
+// নির্দিষ্ট সময় ধরে ওপর-নিচে স্ক্রোল করার ফাংশন
+async function autoScroll(page, durationMs) {
+    const startTime = Date.now();
+    while (Date.now() - startTime < durationMs) {
+        await page.evaluate(() => {
+            window.scrollBy(0, 300);
+        });
+        await new Promise(resolve => setTimeout(resolve, 1000)); // ১ সেকেন্ড বিরতি দিয়ে স্ক্রোল
+        await page.evaluate(() => {
+            window.scrollBy(0, -150);
+        });
+        await new Promise(resolve => setTimeout(resolve, 1000));
+    }
+}
+
+// ইনফিনিট লুপ ও র্যান্ডম বিরতি (৫ থেকে ১০ সেকেন্ড)
+async function mainLoop() {
     while (true) {
         await runBot();
-        
-        // ৫ থেকে ১০ সেকেন্ডের মধ্যে র্যান্ডম একটি সময় হিসাব করা হচ্ছে
-        const randomWait = getRandomDelay(5, 10);
-        console.log(`Waiting for ${randomWait / 1000} seconds before next session...`);
-        
-        await new Promise(resolve => setTimeout(resolve, randomWait));
+        const randomDelay = Math.floor(Math.random() * 6000) + 5000; // ৫ থেকে ১০ সেকেন্ড র্যান্ডম বিরতি
+        console.log(`Waiting for ${randomDelay / 1000} seconds before next session...\n`);
+        await new Promise(resolve => setTimeout(resolve, randomDelay));
     }
 }
 
-startLoop();
+mainLoop();
