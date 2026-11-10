@@ -29,6 +29,10 @@ jobs:
       - name: Run Bot Script
         env:
           VISITOR_COUNT: ${{ github.event.inputs.visitor_count || 10 }}
+          PROXY_HOST: ${{ secrets.PROXY_HOST }}
+          PROXY_PORT: ${{ secrets.PROXY_PORT }}
+          PROXY_USER: ${{ secrets.PROXY_USER }}
+          PROXY_PASS: ${{ secrets.PROXY_PASS }}
         run: node index.js
 
       - name: Upload Screenshots as Artifacts
