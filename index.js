@@ -1,6 +1,7 @@
-const puppeteer =- require('puppeteer-extra');
+const puppeteer = require('puppeteer-extra');
 const StealthPlugin = require('puppeteer-extra-plugin-stealth');
 
+// পাপেটিয়ার-এক্সট্রার সাথে স্টিলথ প্লাগইন যুক্ত করা হলো
 puppeteer.use(StealthPlugin());
 
 const TOTAL_VISITORS = parseInt(process.env.VISITOR_COUNT) || 50; 
@@ -160,7 +161,7 @@ async function runSingleVisitor(visitorIndex) {
         console.log(`[Visitor ${visitorNum}] Session completed successfully!`);
 
     } catch (error) {
-        console.error(`[Visitor ${visitorNum}] Error [Visitor ${visitorNum}]:`, error.message);
+        console.error(`[Visitor ${visitorNum}] Error:`, error.message);
     } finally {
         await browser.close();
     }
