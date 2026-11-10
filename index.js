@@ -25,7 +25,6 @@ const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 async function runSingleVisitor(visitorIndex) {
     console.log(`[Visitor ${visitorIndex + 1}] Starting session...`);
     
-    // র‍্যান্ডম ইউজার-এজেন্ট সিলেক্ট
     const randomUA = USER_AGENTS[Math.floor(Math.random() * USER_AGENTS.length)];
 
     const browser = await puppeteer.launch({
@@ -40,14 +39,13 @@ async function runSingleVisitor(visitorIndex) {
             '--disable-infobars',
             '--window-position=0,0',
             '--ignore-certificate-errors',
-            '--user-data-dir=/tmp/chrome-user-data-' + Math.random() + '-' + Date.now(), // একাধিক ব্রাউজার কনফ্লিক্ট ও SingletonLock এরর ফিক্স করার জন্য
+            '--user-data-dir=/tmp/chrome-user-data-' + Math.random() + '-' + Date.now(),
             '--proxy-server=http://gw.dataimpulse.com:10000'
         ]
     });
 
     const page = await browser.newPage();
 
-    // DataImpulse প্রক্সিতে সেশন আইডি দিয়ে ১০০% ইউনিক আইপি জেনারেট করা
     const randomSessionId = Math.floor(Math.random() * 10000000);
     const proxyUser = `4903c5e423ff85d767de_gr_session-${randomSessionId}`;
 
@@ -69,7 +67,6 @@ async function runSingleVisitor(visitorIndex) {
             timeout: 60000 
         });
 
-        // "I am not a robot" বা ক্যাপচা পপআপ চেকিং
         const isRobotPopup = await page.evaluate(() => {
             const text = document.body.innerText || '';
             return text.includes('I am not a robot') || text.includes('Verify you are human') || text.includes('cf-challenge');
@@ -80,6 +77,9 @@ async function runSingleVisitor(visitorIndex) {
             await browser.close();
             return;
         }
+
+        // স্ক্রিনশট ১: পেজে ঢোকার পর
+        await page.screenshot({ path: `visitor-${visitorIndex + 1}-step1-visited.png` });
 
         // ১. ৫ সেকেন্ড স্ক্রোল
         console.log(`[Visitor ${visitorIndex + 1}] Human-like scrolling (5s)...`);
@@ -105,9 +105,15 @@ async function runSingleVisitor(visitorIndex) {
             console.log(`[Visitor ${visitorIndex + 1}] Red button not found.`);
         }
 
+        // স্ক্রিনশট ২: লাল বাটনে ক্লিক করার পরে
+        await page.screenshot({ path: `visitor-${visitorIndex + 1}-step2-clicked.png` });
+
         // ৩. ক্লিকের পর আরও ৫ সেকেন্ড স্ক্রোল
         console.log(`[Visitor ${visitorIndex + 1}] Post-click scrolling (5s)...`);
         await humanLikeScroll(page, 5000);
+
+        // স্ক্রিনশট ৩: সেশন শেষ হওয়ার ঠিক আগে
+        await page.screenshot({ path: `visitor-${visitorIndex + 1}-step3-finished.png` });
 
         console.log(`[Visitor ${visitorIndex + 1}] Session completed!`);
 
@@ -118,7 +124,6 @@ async function runSingleVisitor(visitorIndex) {
     }
 }
 
-// স্ক্রোলিং ফাংশন
 async function humanLikeScroll(page, durationMs) {
     const startTime = Date.now();
     while (Date.now() - startTime < durationMs) {
@@ -133,7 +138,6 @@ async function humanLikeScroll(page, durationMs) {
     }
 }
 
-// সমান্তরালভাবে ভিজিটর রান করানো
 async function runVisitorsParallel() {
     console.log(`Starting batch of ${TOTAL_VISITORS} stealth visitors with unique IPs...\n`);
     const tasks = [];
