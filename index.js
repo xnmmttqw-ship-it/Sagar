@@ -1,38 +1,41 @@
 const puppeteer = require('puppeteer-extra');
 const StealthPlugin = require('puppeteer-extra-plugin-stealth');
 
-// পাপেটিয়ার-এক্সট্রার সাথে স্টিলথ প্লাগইন যুক্ত করা হলো
+// বটের পরিচয় লুকানোর স্টিলথ প্লাগইন
 puppeteer.use(StealthPlugin());
 
+// গিটহাব ইনপুট থেকে মানগুলো ডায়নামিকভাবে রিসিভ করা
 const TOTAL_VISITORS = parseInt(process.env.VISITOR_COUNT) || 50; 
-const CONCURRENT_LIMIT = 5; // সবসময় একসাথে সর্বোচ্চ ৫ জন একটিভ থাকবে
+const CONCURRENT_LIMIT = 20; // একসাথে ২০ জনের ডাইনামিক রানিং পুল
+const COUNTRY = (process.env.COUNTRY_CODE || 'ca').toLowerCase().trim(); 
+const TARGET_URL = process.env.CAMPAIGN_URL || 'https://auctionr.org/4/5a41eae4c9364b8088fd4ff777a02672'; 
 
 const USER_AGENTS = [
+    // অ্যান্ড্রয়েড ও আইফোন (মোবাইল ভিজিটর)
     'Mozilla/5.0 (Linux; Android 13; SM-S918B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Mobile Safari/537.36',
     'Mozilla/5.0 (iPhone; CPU iPhone OS 17_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.1 Mobile/15E148 Safari/604.1',
     'Mozilla/5.0 (Linux; Android 12; Pixel 6) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/118.0.0.0 Mobile Safari/537.36',
-    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-    'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36',
     'Mozilla/5.0 (Linux; Android 13; Redmi Note 12) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36',
     'Mozilla/5.0 (iPad; CPU OS 16_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Mobile/15E148 Safari/604.1',
-    'Mozilla/5.0 (Linux; Android 11; OnePlus 9) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/117.0.0.0 Mobile Safari/537.36',
-    'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:109.0) Gecko/20100101 Firefox/119.0',
-    'Mozilla/5.0 (Linux; Android 14; SM-A546B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36'
+    // উইন্ডোজ ও ম্যাক (ডেস্কটপ ভিজিটর)
+    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+    'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36',
+    'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:109.0) Gecko/20100101 Firefox/119.0'
 ];
 
 const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
 async function runSingleVisitor(visitorIndex) {
     const visitorNum = visitorIndex + 1;
-    console.log(`[Visitor ${visitorNum}] Starting session...`);
+    console.log(`[Visitor ${visitorNum}] Starting session (Country: ${COUNTRY.toUpperCase()})...`);
     
-    // শুধু ১, ১০, ২০, ৩০, ৪০, ৫০... এই নাম্বারগুলোর জন্য স্ক্রিনশট তোলার শর্ত
+    // শুধুমাত্র ১, ১০, ২০, ৩০, ৪০... নম্বর ভিজিটরদের স্ক্রিনশট সেভ হবে
     const takeScreenshot = (visitorNum === 1 || visitorNum % 10 === 0);
 
-    // হিমালয়া প্রক্সি ইনফরমেশন সরাসরি কোডের ভেতরে বসানো
+    // হিমালয়া প্রক্সি ডাইনামিক ইউজারনেম সেটিং
     const proxyHost = 'premium.hproxy.com';
     const proxyPort = '9000';
-    const proxyUser = 'hproxy_16o3tblbl7xi-type-residential-country-us';
+    const proxyUser = `hproxy_16o3tblbl7xi-type-residential-country-${COUNTRY}`; 
     const proxyPass = '625ae9b4-1138-45b0-9bcd-80fcca6c67b3';
 
     const browser = await puppeteer.launch({
@@ -54,7 +57,6 @@ async function runSingleVisitor(visitorIndex) {
 
     const page = await browser.newPage();
 
-    // প্রক্সি ইউজারনেম ও পাসওয়ার্ড অথেন্টিকেশন
     await page.authenticate({
         username: proxyUser,
         password: proxyPass
@@ -69,7 +71,7 @@ async function runSingleVisitor(visitorIndex) {
 
     try {
         console.log(`[Visitor ${visitorNum}] Visiting target URL via Residential Proxy...`);
-        await page.goto('https://auctionr.org/4/5a41eae4c9364b8088fd4ff777a02672', { 
+        await page.goto(TARGET_URL, { 
             waitUntil: 'networkidle0',
             timeout: 60000 
         });
@@ -80,20 +82,22 @@ async function runSingleVisitor(visitorIndex) {
         });
 
         if (isRobotPopup) {
-            console.log(`[Visitor ${visitorNum}] Block/Captcha detected! Skipping...`);
+            console.log(`[Visitor ${visitorNum}] Captcha/Block detected! Skipping...`);
             await browser.close();
             return;
         }
 
-        // --- মূল পেজে ৩০ সেকেন্ড অবস্থান ও আপ-ডাউন স্ক্রোলিং ---
-        console.log(`[Visitor ${visitorNum}] Staying on main page & scrolling for ~30 seconds...`);
+        // --- মূল পেজে ৩০-৩৫ সেকেন্ডের অর্গানিক স্ক্রোলিং ---
+        console.log(`[Visitor ${visitorNum}] Scrolling main page (~30s)...`);
         const mainStartTime = Date.now();
+        const mainTargetTime = 30000 + Math.floor(Math.random() * 5000); // ৩০-৩৫ সেকেন্ডের সময়সূচি
         let scrollCount = 0;
 
-        while (Date.now() - mainStartTime < 30000) {
-            await page.evaluate(() => window.scrollBy(0, 300));
+        while (Date.now() - mainStartTime < mainTargetTime) {
+            // মানুষের মতো রেন্ডম মাপে স্ক্রোল
+            await page.evaluate(() => window.scrollBy(0, Math.floor(Math.random() * 200) + 200));
             await delay(2500);
-            await page.evaluate(() => window.scrollBy(0, -200));
+            await page.evaluate(() => window.scrollBy(0, -150));
             await delay(2500);
             
             scrollCount++;
@@ -102,7 +106,7 @@ async function runSingleVisitor(visitorIndex) {
             }
         }
 
-        // --- বাটন বা লিংকে ক্লিক করার অংশ ---
+        // --- বাটনে ক্লিক লজিক ---
         const newPagePromise = new Promise(resolve => browser.once('target', async target => {
             const newPage = await target.page();
             resolve(newPage);
@@ -119,12 +123,10 @@ async function runSingleVisitor(visitorIndex) {
         });
 
         if (clicked) {
-            console.log(`[Visitor ${visitorNum}] Successfully clicked button!`);
-        } else {
-            console.log(`[Visitor ${visitorNum}] Button not found, continuing session...`);
+            console.log(`[Visitor ${visitorNum}] Successfully clicked target element.`);
         }
 
-        // --- পরবর্তী পেজে গিয়ে ১৫ সেকেন্ড আপ-ডাউন স্ক্রোলিং ---
+        // --- গন্তব্য বা অ্যাড পেজে ১৫-২০ সেকেন্ড অর্গানিক স্ক্রোলিং ---
         try {
             const adPage = await Promise.race([
                 newPagePromise,
@@ -134,17 +136,18 @@ async function runSingleVisitor(visitorIndex) {
             const targetPage = adPage || page;
             if (adPage) {
                 await adPage.bringToFront();
-                console.log(`[Visitor ${visitorNum}] Switched to new target/ad page.`);
+                console.log(`[Visitor ${visitorNum}] Focused on new tab page.`);
             }
 
-            console.log(`[Visitor ${visitorNum}] Staying on destination page & scrolling for 15 seconds...`);
+            console.log(`[Visitor ${visitorNum}] Scrolling destination page (~15s)...`);
             const subStartTime = Date.now();
+            const subTargetTime = 15000 + Math.floor(Math.random() * 4000); // ১৫-১৯ সেকেন্ড
             let subScrollCount = 0;
 
-            while (Date.now() - subStartTime < 15000) {
-                await targetPage.evaluate(() => window.scrollBy(0, 350));
+            while (Date.now() - subStartTime < subTargetTime) {
+                await targetPage.evaluate(() => window.scrollBy(0, Math.floor(Math.random() * 250) + 150));
                 await delay(2500);
-                await targetPage.evaluate(() => window.scrollBy(0, -250));
+                await targetPage.evaluate(() => window.scrollBy(0, -200));
                 await delay(2500);
 
                 subScrollCount++;
@@ -154,7 +157,6 @@ async function runSingleVisitor(visitorIndex) {
             }
 
         } catch (e) {
-            console.log(`[Visitor ${visitorNum}] Navigation handling finished with fallback time.`);
             await delay(15000);
         }
 
@@ -168,12 +170,11 @@ async function runSingleVisitor(visitorIndex) {
 }
 
 async function runVisitorsPool() {
-    console.log(`Starting ${TOTAL_VISITORS} visitors with dynamic rolling limit of ${CONCURRENT_LIMIT}...\n`);
+    console.log(`Starting ${TOTAL_VISITORS} visitors | Target: ${TARGET_URL} | Country: ${COUNTRY.toUpperCase()} | Pool: ${CONCURRENT_LIMIT}\n`);
     
     let currentIndex = 0;
     const workers = [];
 
-    // একটি করে ভিজিটর নিয়ে কাজ করবে এবং শেষ হওয়া মাত্র কিউ থেকে পরের জন ঢুকে পড়বে
     async function worker() {
         while (currentIndex < TOTAL_VISITORS) {
             const visitorIndex = currentIndex++;
@@ -181,15 +182,13 @@ async function runVisitorsPool() {
         }
     }
 
-    // একসাথে নির্দিষ্ট সংখ্যক (৫টি) ওয়ার্কার বা স্লট চালু করা হলো
+    // একসাথে ২০ জন করে পুল চালু রাখা
     for (let i = 0; i < Math.min(CONCURRENT_LIMIT, TOTAL_VISITORS); i++) {
         workers.push(worker());
     }
 
-    // সব ভিজিটরের কাজ শেষ হওয়া পর্যন্ত অপেক্ষা করবে
     await Promise.all(workers);
-
-    console.log(`\nAll ${TOTAL_VISITORS} visitors completed their sessions successfully!`);
+    console.log(`\nAll ${TOTAL_VISITORS} visitors completed their sessions!`);
 }
 
 runVisitorsPool();
