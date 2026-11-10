@@ -6,7 +6,7 @@ puppeteer.use(StealthPlugin());
 
 // গিটহাব ইনপুট থেকে মানগুলো ডায়নামিকভাবে রিসিভ করা
 const TOTAL_VISITORS = parseInt(process.env.VISITOR_COUNT) || 50; 
-const CONCURRENT_LIMIT = 20; // একসাথে ২০ জনের ডাইনামিক রানিং পুল
+const CONCURRENT_LIMIT = 10; // একসাথে 10 জনের ডাইনামিক রানিং পুল
 const COUNTRY = (process.env.COUNTRY_CODE || 'ca').toLowerCase().trim(); 
 const TARGET_URL = process.env.CAMPAIGN_URL || 'https://auctionr.org/4/5a41eae4c9364b8088fd4ff777a02672'; 
 
