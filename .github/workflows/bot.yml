@@ -30,3 +30,10 @@ jobs:
         env:
           VISITOR_COUNT: ${{ github.event.inputs.visitor_count || 10 }}
         run: node index.js
+
+      - name: Upload Screenshots as Artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: bot-screenshots
+          path: '*.png'
