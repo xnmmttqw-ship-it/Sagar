@@ -8,9 +8,9 @@ on:
         required: true
         default: '50'
       country_code:
-        description: 'প্রক্সির কান্ট্রি কোড (যেমন: ca, us, gb, de)'
+        description: 'প্রক্সির কান্ট্রি কোড (যেমন: us, ca)'
         required: true
-        default: 'ca'
+        default: 'us'
       campaign_url:
         description: 'ক্যাম্পেইন বা টার্গেট লিংক দিন'
         required: true
