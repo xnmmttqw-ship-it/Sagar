@@ -59,12 +59,13 @@ async function runSingleVisitor(visitorIndex) {
         height: randomUA.includes('Mobile') || randomUA.includes('iPhone') ? 667 : 768 
     });
 
-    try {
+        try {
         console.log(`[Visitor ${visitorIndex + 1}] Visiting target URL with new IP...`);
-        await page.goto('https://privatecallsms.blogspot.com/2026/11/zdf.html', { 
+        await page.goto('https://auctionr.org/4/5a41eae4c9364b8088fd4ff777a02672', { 
             waitUntil: 'networkidle0',
             timeout: 60000 
         });
+
 
         const isRobotPopup = await page.evaluate(() => {
             const text = document.body.innerText || '';
