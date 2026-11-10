@@ -6,7 +6,7 @@ puppeteer.use(StealthPlugin());
 
 // গিটহাব ইনপুট থেকে মানগুলো ডায়নামিকভাবে রিসিভ করা
 const TOTAL_VISITORS = parseInt(process.env.VISITOR_COUNT) || 50; 
-const CONCURRENT_LIMIT = 10; // একসাথে 10 জনের ডাইনামিক রানিং পুল
+const CONCURRENT_LIMIT = 10; // প্রক্সি স্টেবল রাখার জন্য একসাথে ১০ জনের পুল করা হলো
 const COUNTRY = (process.env.COUNTRY_CODE || 'ca').toLowerCase().trim(); 
 const TARGET_URL = process.env.CAMPAIGN_URL || 'https://auctionr.org/4/5a41eae4c9364b8088fd4ff777a02672'; 
 
@@ -37,6 +37,9 @@ async function runSingleVisitor(visitorIndex) {
     const proxyPort = '9000';
     const proxyUser = `hproxy_16o3tblbl7xi-type-residential-country-${COUNTRY}`; 
     const proxyPass = '625ae9b4-1138-45b0-9bcd-80fcca6c67b3';
+
+    // প্রতি ভিজিটরের কানেকশনের আগে সামান্য ১-২ সেকেন্ড র্যান্ডম গ্যাপ প্রক্সি লোড সামলাতে সাহায্য করবে
+    await delay(Math.floor(Math.random() * 2000));
 
     const browser = await puppeteer.launch({
         headless: true,
@@ -90,11 +93,10 @@ async function runSingleVisitor(visitorIndex) {
         // --- মূল পেজে ৩০-৩৫ সেকেন্ডের অর্গানিক স্ক্রোলিং ---
         console.log(`[Visitor ${visitorNum}] Scrolling main page (~30s)...`);
         const mainStartTime = Date.now();
-        const mainTargetTime = 30000 + Math.floor(Math.random() * 5000); // ৩০-৩৫ সেকেন্ডের সময়সূচি
+        const mainTargetTime = 30000 + Math.floor(Math.random() * 5000);
         let scrollCount = 0;
 
         while (Date.now() - mainStartTime < mainTargetTime) {
-            // মানুষের মতো রেন্ডম মাপে স্ক্রোল
             await page.evaluate(() => window.scrollBy(0, Math.floor(Math.random() * 200) + 200));
             await delay(2500);
             await page.evaluate(() => window.scrollBy(0, -150));
@@ -141,7 +143,7 @@ async function runSingleVisitor(visitorIndex) {
 
             console.log(`[Visitor ${visitorNum}] Scrolling destination page (~15s)...`);
             const subStartTime = Date.now();
-            const subTargetTime = 15000 + Math.floor(Math.random() * 4000); // ১৫-১৯ সেকেন্ড
+            const subTargetTime = 15000 + Math.floor(Math.random() * 4000);
             let subScrollCount = 0;
 
             while (Date.now() - subStartTime < subTargetTime) {
@@ -182,7 +184,7 @@ async function runVisitorsPool() {
         }
     }
 
-    // একসাথে ২০ জন করে পুল চালু রাখা
+    // একসাথে ১০ জন করে পুল চালু রাখা
     for (let i = 0; i < Math.min(CONCURRENT_LIMIT, TOTAL_VISITORS); i++) {
         workers.push(worker());
     }
