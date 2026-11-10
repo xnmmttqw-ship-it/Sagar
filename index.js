@@ -3,8 +3,8 @@ const StealthPlugin = require('puppeteer-extra-plugin-stealth');
 
 puppeteer.use(StealthPlugin());
 
-// গিটহাব ইনপুট বা ডিফল্ট ১০ জন ভিজিটর
-const TOTAL_VISITORS = parseInt(process.env.VISITOR_COUNT) || 10;
+const TOTAL_VISITORS = parseInt(process.env.VISITOR_COUNT) || 500;
+const CONCURRENT_LIMIT = 20; 
 
 const USER_AGENTS = [
     'Mozilla/5.0 (Linux; Android 13; SM-S918B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Mobile Safari/537.36',
@@ -59,34 +59,31 @@ async function runSingleVisitor(visitorIndex) {
         height: randomUA.includes('Mobile') || randomUA.includes('iPhone') ? 667 : 768 
     });
 
-        try {
+    try {
         console.log(`[Visitor ${visitorIndex + 1}] Visiting target URL with new IP...`);
         await page.goto('https://auctionr.org/4/5a41eae4c9364b8088fd4ff777a02672', { 
             waitUntil: 'networkidle0',
             timeout: 60000 
         });
 
-
         const isRobotPopup = await page.evaluate(() => {
             const text = document.body.innerText || '';
-            return text.includes('I am not a robot') || text.includes('Verify you are human') || text.includes('cf-challenge');
+            return text.includes('I am not a robot') || text.includes('Verify you are human') || text.includes('cf-challenge') || text.includes('Anonymous Proxy detected');
         });
 
         if (isRobotPopup) {
-            console.log(`[Visitor ${visitorIndex + 1}] Robot popup detected! Skipping this session...`);
+            console.log(`[Visitor ${visitorIndex + 1}] Robot/Proxy block detected! Skipping...`);
             await browser.close();
             return;
         }
 
-        // অ্যাড লোড হওয়ার সময় প্রতি ২ সেকেন্ডে স্ক্রিনশট (মোট ৬ সেকেন্ডে ৩টি)
-        console.log(`[Visitor ${visitorIndex + 1}] Taking screenshots every 2s while waiting for ads...`);
+        // পেজ লোড হওয়ার সময় প্রতি ২ সেকেন্ডে স্ক্রিনশট (৩টি)
         for (let s = 1; s <= 3; s++) {
             await delay(2000);
             await page.screenshot({ path: `visitor-${visitorIndex + 1}-load-2s-${s}.png`, fullPage: true });
         }
 
-        // মানবিকভাবে স্ক্রোল করার সময় প্রতি ২ সেকেন্ডে স্ক্রিনশট
-        console.log(`[Visitor ${visitorIndex + 1}] Human-like scrolling with screenshots every 2s...`);
+        // স্ক্রোলিং ও স্ক্রিনশট
         for (let s = 1; s <= 3; s++) {
             const scrollAmount = Math.floor(Math.random() * 200) + 100;
             await page.evaluate((y) => window.scrollBy(0, y), scrollAmount);
@@ -94,10 +91,8 @@ async function runSingleVisitor(visitorIndex) {
             await page.screenshot({ path: `visitor-${visitorIndex + 1}-scroll-2s-${s}.png`, fullPage: true });
         }
 
-        // লাল বাটনে ক্লিক
-        console.log(`[Visitor ${visitorIndex + 1}] Clicking the red button...`);
+        // লাল বাটন বা লিংকে ক্লিক
         await delay(1000);
-
         const newPagePromise = new Promise(resolve => browser.once('target', async target => {
             const newPage = await target.page();
             resolve(newPage);
@@ -105,7 +100,7 @@ async function runSingleVisitor(visitorIndex) {
 
         const clicked = await page.evaluate(() => {
             const allEls = Array.from(document.querySelectorAll('a, button, div, span'));
-            const target = allEls.find(el => el.textContent && el.textContent.includes('পড়া শুরু করুন'));
+            const target = allEls.find(el => el.textContent && (el.textContent.includes('পড়া শুরু করুন') || el.textContent.includes('Click') || el.textContent.includes('Proceed')));
             if (target) {
                 target.click();
                 return true;
@@ -114,12 +109,10 @@ async function runSingleVisitor(visitorIndex) {
         });
 
         if (clicked) {
-            console.log(`[Visitor ${visitorIndex + 1}] Successfully clicked red button!`);
-        } else {
-            console.log(`[Visitor ${visitorIndex + 1}] Red button not found.`);
+            console.log(`[Visitor ${visitorIndex + 1}] Successfully clicked button!`);
         }
 
-        // অ্যাড পেজ বা নতুন ট্যাবে গিয়ে প্রতি ২ সেকেন্ডে স্ক্রিনশট (মোট ১০ সেকেন্ডে ৫টি)
+        // অ্যাড পেজ বা বর্তমান পেজে ১০ সেকেন্ড অবস্থান ও প্রতি ২ সেকেন্ডে স্ক্রিনশট
         try {
             const adPage = await Promise.race([
                 newPagePromise,
@@ -127,29 +120,25 @@ async function runSingleVisitor(visitorIndex) {
             ]);
 
             if (adPage) {
-                console.log(`[Visitor ${visitorIndex + 1}] Ad page detected! Capturing screenshot every 2s for 10s...`);
                 await adPage.bringToFront();
-                
                 for (let s = 1; s <= 5; s++) {
                     await delay(2000);
                     await adPage.screenshot({ path: `visitor-${visitorIndex + 1}-ad-2s-${s}.png`, fullPage: true });
                 }
             } else {
-                console.log(`[Visitor ${visitorIndex + 1}] Capturing screenshot every 2s on current page for 10s...`);
                 for (let s = 1; s <= 5; s++) {
                     await delay(2000);
                     await page.screenshot({ path: `visitor-${visitorIndex + 1}-page-2s-${s}.png`, fullPage: true });
                 }
             }
         } catch (e) {
-            console.log(`[Visitor ${visitorIndex + 1}] Ad timer notice:`, e.message);
             for (let s = 1; s <= 5; s++) {
                 await delay(2000);
                 await page.screenshot({ path: `visitor-${visitorIndex + 1}-fallback-2s-${s}.png`, fullPage: true });
             }
         }
 
-        console.log(`[Visitor ${visitorIndex + 1}] Session completed successfully!`);
+        console.log(`[Visitor ${visitorIndex + 1}] Session completed!`);
 
     } catch (error) {
         console.error(`[Visitor ${visitorIndex + 1}] Error:`, error.message);
@@ -158,17 +147,24 @@ async function runSingleVisitor(visitorIndex) {
     }
 }
 
-async function runVisitorsParallel() {
-    console.log(`Starting batch of ${TOTAL_VISITORS} stealth visitors with unique IPs...\n`);
-    const tasks = [];
+async function runVisitorsInBatches() {
+    console.log(`Starting ${TOTAL_VISITORS} visitors with batch size of ${CONCURRENT_LIMIT}...\n`);
     
-    for (let i = 0; i < TOTAL_VISITORS; i++) {
-        tasks.push(runSingleVisitor(i));
-        await delay(Math.floor(Math.random() * 1500) + 500);
+    for (let i = 0; i < TOTAL_VISITORS; i += CONCURRENT_LIMIT) {
+        const batch = [];
+        const endIndex = Math.min(i + CONCURRENT_LIMIT, TOTAL_VISITORS);
+        
+        for (let j = i; j < endIndex; j++) {
+            batch.push(runSingleVisitor(j));
+        }
+        
+        console.log(`\n--- Running batch: Visitors ${i + 1} to ${endIndex} ---`);
+        await Promise.all(batch);
+        
+        await delay(2000);
     }
 
-    await Promise.all(tasks);
-    console.log(`\nAll ${TOTAL_VISITORS} visitors finished their sessions.`);
+    console.log(`\nAll ${TOTAL_VISITORS} visitors completed their sessions.`);
 }
 
-runVisitorsParallel();
+runVisitorsInBatches();
