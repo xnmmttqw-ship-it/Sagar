@@ -6,7 +6,7 @@ puppeteer.use(StealthPlugin());
 
 // গিটহাব ইনপুট থেকে মানগুলো ডায়নামিকভাবে রিসিভ করা
 const TOTAL_VISITORS = parseInt(process.env.VISITOR_COUNT) || 50; 
-const CONCURRENT_LIMIT = 10; // প্রক্সি স্টেবল রাখার জন্য একসাথে ১০ জনের পুল করা হলো
+const CONCURRENT_LIMIT = 5; // প্রক্সি টানেল ফেইলড এড়াতে একসাথে সর্বোচ্চ ৫ জন রান করবে
 const COUNTRY = (process.env.COUNTRY_CODE || 'ca').toLowerCase().trim(); 
 const TARGET_URL = process.env.CAMPAIGN_URL || 'https://auctionr.org/4/5a41eae4c9364b8088fd4ff777a02672'; 
 
@@ -38,8 +38,8 @@ async function runSingleVisitor(visitorIndex) {
     const proxyUser = `hproxy_16o3tblbl7xi-type-residential-country-${COUNTRY}`; 
     const proxyPass = '625ae9b4-1138-45b0-9bcd-80fcca6c67b3';
 
-    // প্রতি ভিজিটরের কানেকশনের আগে সামান্য ১-২ সেকেন্ড র্যান্ডম গ্যাপ প্রক্সি লোড সামলাতে সাহায্য করবে
-    await delay(Math.floor(Math.random() * 2000));
+    // প্রক্সি সার্ভারে অতিরিক্ত চাপ এড়াতে প্রতিটি ব্রাউজার শুরুর আগে র‍্যান্ডম গ্যাপ
+    await delay(Math.floor(Math.random() * 3000) + 1000);
 
     const browser = await puppeteer.launch({
         headless: true,
@@ -172,7 +172,7 @@ async function runSingleVisitor(visitorIndex) {
 }
 
 async function runVisitorsPool() {
-    console.log(`Starting ${TOTAL_VISITORS} visitors | Target: ${TARGET_URL} | Country: ${COUNTRY.toUpperCase()} | Pool: ${CONCURRENT_LIMIT}\n`);
+    console.log(`Starting ${TOTAL_VISITORS} visitors | Target: ${TARGET_URL} | Country: ${COUNTRY.toUpperCase()} | Safe Pool: ${CONCURRENT_LIMIT}\n`);
     
     let currentIndex = 0;
     const workers = [];
@@ -184,9 +184,10 @@ async function runVisitorsPool() {
         }
     }
 
-    // একসাথে ১০ জন করে পুল চালু রাখা
+    // একসাথে ৫ জন করে নিরাপদ পুলে রান করানো এবং প্রতিটি ওয়ার্কার চালুর মাঝে ১ সেকেন্ড বিরতি
     for (let i = 0; i < Math.min(CONCURRENT_LIMIT, TOTAL_VISITORS); i++) {
         workers.push(worker());
+        await delay(1000); 
     }
 
     await Promise.all(workers);
