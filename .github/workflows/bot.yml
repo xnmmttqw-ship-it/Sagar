@@ -1,0 +1,25 @@
+name: Run Puppeteer Bot
+
+on:
+  schedule:
+    - cron: '*/30 * * * *' # প্রতি ৩০ মিনিট পর পর অটোমেটিক রান হবে
+  workflow_dispatch: # ম্যানুয়ালি রান করার বাটনও থাকবে
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install Dependencies
+        run: npm install
+
+      - name: Run Bot Script
+        run: node index.js
