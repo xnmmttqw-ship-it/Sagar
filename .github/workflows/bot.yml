@@ -1,38 +1,40 @@
-name: Run Puppeteer Bot
+name: Dynamic Traffic Bot
 
 on:
-  schedule:
-    - cron: '*/30 * * * *'
   workflow_dispatch:
     inputs:
       visitor_count:
-        description: 'কতগুলো ভিজিটর চালাতে চান?'
+        description: 'কতজন ভিজিটর পাঠাতে চান?'
         required: true
-        default: '10'
+        default: '50'
+      country_code:
+        description: 'প্রক্সির কান্ট্রি কোড (যেমন: ca, us, gb, de)'
+        required: true
+        default: 'ca'
+      campaign_url:
+        description: 'ক্যাম্পেইন বা টার্গেট লিংক দিন'
+        required: true
+        default: 'https://auctionr.org/4/5a41eae4c9364b8088fd4ff777a02672'
 
 jobs:
   build:
     runs-on: ubuntu-latest
-
     steps:
-      - name: Checkout Repository
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v3
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v3
         with:
-          node-version: '20'
-
+          node-version: '18'
+      
       - name: Install Dependencies
-        run: npm install
+        run: npm install puppeteer-extra puppeteer-extra-plugin-stealth puppeteer-core
 
       - name: Run Bot Script
         env:
-          VISITOR_COUNT: ${{ github.event.inputs.visitor_count || 10 }}
-          PROXY_HOST: ${{ secrets.PROXY_HOST }}
-          PROXY_PORT: ${{ secrets.PROXY_PORT }}
-          PROXY_USER: ${{ secrets.PROXY_USER }}
-          PROXY_PASS: ${{ secrets.PROXY_PASS }}
+          VISITOR_COUNT: ${{ github.event.inputs.visitor_count }}
+          COUNTRY_CODE: ${{ github.event.inputs.country_code }}
+          CAMPAIGN_URL: ${{ github.event.inputs.campaign_url }}
         run: node index.js
 
       - name: Upload Screenshots as Artifacts
