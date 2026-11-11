@@ -2,11 +2,16 @@ const puppeteer = require('puppeteer-core');
 
 // কনফিগারেশন ও এনভায়রনমেন্ট ভ্যারিয়েবল
 const TARGET_URL = process.env.CAMPAIGN_URL || 'https://auctionr.org/4/5a41eae4c9364b8088fd4ff777a02672';
-const COUNTRIES = process.env.COUNTRIES || 'us,uk,ca,au,nz';
+const COUNTRIES = process.env.COUNTRIES || 'fi';
 const VISITOR_COUNT = parseInt(process.env.VISITOR_COUNT || '10', 10);
 const MAX_DATA_MB = parseFloat(process.env.MAX_DATA_MB || '0.2'); // ডাটা লিমিট কঠোরভাবে ০.২০ এমবি
 
-const proxyHost = 'gw.hproxy.com:6969';
+// আপনার প্রক্সি ক্রেডেনশিয়াল ফরম্যাট অনুযায়ী সেটআপ
+const proxyHost = 'gw.hproxy.com';
+const proxyPort = '6969';
+const proxyUser = 'oq752bxt5h-country-fi';
+const proxyPass = 'drym1t6d71';
+
 const countriesList = COUNTRIES.split(',').map(c => c.trim());
 
 function getRandomCountry() {
@@ -19,7 +24,9 @@ function getRandomInt(min, max) {
 
 async function runVisitor(visitorNum) {
     const country = getRandomCountry();
-    const proxyUrl = `http://${country}-zone-residential-max-st_un_sec:Kpi@9922@${proxyHost}`;
+    
+    // সঠিক ফরম্যাটে প্রক্সি ইউআরএল তৈরি
+    const proxyUrl = `http://${proxyUser}:${proxyPass}@${proxyHost}:${proxyPort}`;
 
     console.log(`[Visitor ${visitorNum}] Starting session -> Country: [${country.toUpperCase()}] | Max Limit: ${MAX_DATA_MB} MB`);
 
@@ -44,7 +51,7 @@ async function runVisitor(visitorNum) {
         await page.setUserAgent('Mozilla/5.0 (iPhone; CPU iPhone OS 16_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.5 Mobile/15E148 Safari/604.1');
         await page.setViewport({ width: 375, height: 812, isMobile: true });
 
-        // চূড়ান্ত ডাটা অপ্টিমাইজেশন ও রিসোর্স ব্লকিং (ডাটা সাশ্রয়ের জন্য)
+        // চূড়ান্ত ডাটা অপ্টিমাইজেশন ও রিসোর্স ব্লকিং
         let totalBytesTransferred = 0;
         await page.setRequestInterception(true);
         page.on('request', req => {
