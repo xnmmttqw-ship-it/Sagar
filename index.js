@@ -5,7 +5,7 @@ puppeteer.use(StealthPlugin());
 
 const TOTAL_VISITORS = parseInt(process.env.VISITOR_COUNT) || 50; 
 const CONCURRENT_LIMIT = 5; 
-const COUNTRY = (process.env.COUNTRY_CODE || 'ca').toLowerCase().trim(); 
+const COUNTRY = 'no'; // নরওয়ে কান্ট্রি কোড
 const TARGET_URL = process.env.CAMPAIGN_URL || 'https://auctionr.org/4/5a41eae4c9364b8088fd4ff777a02672'; 
 
 const USER_AGENTS = [
@@ -20,13 +20,14 @@ const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
 async function runSingleVisitor(visitorIndex) {
     const visitorNum = visitorIndex + 1;
-    console.log(`[Visitor ${visitorNum}] Starting session (Lite Proxy - Country: ${COUNTRY.toUpperCase()})...`);
+    console.log(`[Visitor ${visitorNum}] Starting session (Norway Proxy)...`);
     
     const takeScreenshot = (visitorNum === 1 || visitorNum % 10 === 0);
 
+    // নরওয়ে (Norway) প্রক্সি ডিটেইলস
     const proxyHost = 'gw.hproxy.com';
     const proxyPort = '6969';
-    const proxyUser = 'oq752bxt5h-country-ca'; 
+    const proxyUser = 'oq752bxt5h-country-no'; 
     const proxyPass = 'drym1t6d71';
 
     await delay(Math.floor(Math.random() * 2000) + 1000);
@@ -69,7 +70,7 @@ async function runSingleVisitor(visitorIndex) {
             timeout: 60000 
         });
 
-        // --- ১৮+ পপআপ বা ভেরিফিকেশন চেক ও অটো-ক্লিক হ্যান্ডলিং ---
+        // --- সিকিউরিটি / ১৮+ পপআপ বা ভেরিফিকেশন অটো-ক্লিক হ্যান্ডলিং ---
         await delay(3000);
         const handledPopup = await page.evaluate(() => {
             const allEls = Array.from(document.querySelectorAll('button, a, div, span'));
@@ -88,21 +89,21 @@ async function runSingleVisitor(visitorIndex) {
         });
 
         if (handledPopup) {
-            console.log(`[Visitor ${visitorNum}] Age verification / Pop-up bypassed successfully!`);
-            await delay(4000); // পপআপ পার হওয়ার পর পেজ লোড হওয়ার জন্য অপেক্ষা
+            console.log(`[Visitor ${visitorNum}] Verification / Age popup bypassed successfully!`);
+            await delay(4000); 
         }
 
-        // --- ১০ থেকে ১৫ সেকেন্ড পেজে অবস্থান ও স্ক্রোলিং ---
-        console.log(`[Visitor ${visitorNum}] Staying on page for 10-15 seconds...`);
+        // --- সিকিউরিটি পার হওয়ার পর সুনির্দিষ্ট ১৫ মিনিট (900 সেকেন্ড) পেজে অবস্থান ও হিউম্যান-লাইক স্ক্রোলিং ---
+        console.log(`[Visitor ${visitorNum}] Security cleared. Staying on page for 15 minutes...`);
         const startTime = Date.now();
-        const targetStayTime = Math.floor(Math.random() * 5000) + 10000; 
+        const targetStayTime = 15 * 60 * 1000; // ঠিক ১৫ মিনিট (১৫ মিনিট × ৬০ সেকেন্ড × ১০০০ মিলিভিসেকেন্ড)
         let scrollCount = 0;
 
         while (Date.now() - startTime < targetStayTime) {
-            await page.evaluate(() => window.scrollBy(0, Math.floor(Math.random() * 150) + 100));
-            await delay(2000);
-            await page.evaluate(() => window.scrollBy(0, -100));
-            await delay(2000);
+            await page.evaluate(() => window.scrollBy(0, Math.floor(Math.random() * 200) + 100));
+            await delay(5000); // ৫ সেকেন্ড বিরতি দিয়ে স্ক্রোল
+            await page.evaluate(() => window.scrollBy(0, -150));
+            await delay(5000);
             
             scrollCount++;
             if (takeScreenshot && scrollCount === 1) {
@@ -123,10 +124,10 @@ async function runSingleVisitor(visitorIndex) {
 
         if (clicked) {
             console.log(`[Visitor ${visitorNum}] Successfully clicked target element.`);
-            await delay(3000);
+            await delay(5000);
         }
 
-        console.log(`[Visitor ${visitorNum}] Session completed successfully!`);
+        console.log(`[Visitor ${visitorNum}] Session completed successfully after 15 minutes!`);
 
     } catch (error) {
         console.error(`[Visitor ${visitorNum}] Error:`, error.message);
@@ -136,7 +137,7 @@ async function runSingleVisitor(visitorIndex) {
 }
 
 async function runVisitorsPool() {
-    console.log(`Starting ${TOTAL_VISITORS} visitors (10-15s stay) | Pool: ${CONCURRENT_LIMIT}\n`);
+    console.log(`Starting ${TOTAL_VISITORS} Norway visitors (15 mins stay) | Pool: ${CONCURRENT_LIMIT}\n`);
     
     let currentIndex = 0;
     const workers = [];
@@ -150,7 +151,7 @@ async function runVisitorsPool() {
 
     for (let i = 0; i < Math.min(CONCURRENT_LIMIT, TOTAL_VISITORS); i++) {
         workers.push(worker());
-        await delay(1000);
+        await delay(2000);
     }
 
     await Promise.all(workers);
