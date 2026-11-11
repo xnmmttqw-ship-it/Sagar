@@ -32,7 +32,6 @@ jobs:
           JOBS_COUNT=$(( (TOTAL + 9) / 10 ))
           if [ $JOBS_COUNT -lt 1 ]; then JOBS_COUNT=1; fi
           
-          # পাইথন ব্যবহার করে একদম নিখুঁত JSON অ্যারে তৈরি করা হলো (কোনো কমা বা ফরম্যাট ভুল হবে না)
           MATRIX_JSON=$(python3 -c "import json; print(json.dumps(list(range(1, $JOBS_COUNT + 1))))")
           echo "matrix=$MATRIX_JSON" >> $GITHUB_OUTPUT
 
@@ -64,7 +63,7 @@ jobs:
           CAMPAIGN_URL: ${{ github.event.inputs.target_url }}
           COUNTRIES: ${{ github.event.inputs.countries }}
           VISITOR_COUNT: 10
-          MAX_DATA_MB: 0.5
+          MAX_DATA_MB: 0.2
         run: node index.js
 
       - name: Upload Screenshots Artifact
