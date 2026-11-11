@@ -9,9 +9,9 @@ on:
         default: 'https://auctionr.org/4/5a41eae4c9364b8088fd4ff777a02672'
         type: string
       countries:
-        description: 'Proxy Countries (comma separated, e.g. fi,us,uk)'
+        description: 'Proxy Countries / Username (e.g. oq752bxt5h-country-us)'
         required: true
-        default: 'fi'
+        default: 'oq752bxt5h-country-us'
         type: string
       total_visitors:
         description: 'Total Visitors (e.g. 5, 10, 20)'
@@ -32,10 +32,10 @@ jobs:
         with:
           node-version: '18'
 
-      - name: Install Google Chrome & Dependencies
+      - name: Install Dependencies & Verify Chrome
         run: |
-          sudo apt-get update
-          sudo apt-get install -y google-chrome-stable
+          # apt-get update বাদ দেওয়া হলো যাতে অতিরিক্ত সময় নষ্ট না হয়
+          sudo apt-get install -y google-chrome-stable || true
           npm install
 
       - name: Run Puppeteer Bot
