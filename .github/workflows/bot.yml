@@ -9,9 +9,9 @@ on:
         default: 'https://auctionr.org/4/5a41eae4c9364b8088fd4ff777a02672'
         type: string
       countries:
-        description: 'Proxy Countries (comma separated, e.g. us,uk,ca)'
+        description: 'Proxy Countries (comma separated, e.g. fi,us,uk)'
         required: true
-        default: 'us,uk,ca,au,nz'
+        default: 'fi'
         type: string
       total_visitors:
         description: 'Total Visitors (e.g. 10, 20, 30)'
@@ -52,9 +52,13 @@ jobs:
         with:
           node-version: '18'
 
-      - name: Install Dependencies
+      - name: Fix Apt Sources & Update
         run: |
-          sudo apt-get update
+          sudo sed -i 's/resolute/noble/g' /etc/apt/sources.list || true
+          sudo apt-get update -o Acquire::Check-Valid-Until=false
+
+      - name: Install Google Chrome & Dependencies
+        run: |
           sudo apt-get install -y google-chrome-stable
           npm install
 
