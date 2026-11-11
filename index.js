@@ -10,7 +10,7 @@ const TOTAL_VISITORS = parseInt(process.env.VISITOR_COUNT) || 1;
 const TARGET_URL = process.env.CAMPAIGN_URL || 'https://auctionr.org/4/5a41eae4c9364b8088fd4ff777a02672'; 
 const MAX_DATA_MB = parseFloat(process.env.MAX_DATA_MB) || 0.2; 
 
-const RAW_COUNTRIES = process.env.COUNTRIES || 'au, nz';
+const RAW_COUNTRIES = process.env.COUNTRIES || 'us';
 const COUNTRY_LIST = RAW_COUNTRIES.split(',').map(c => c.trim().toLowerCase());
 
 const DEVICES_POOL = [
@@ -49,6 +49,7 @@ async function runSingleVisitor(visitorIndex) {
 
     const proxyHost = 'gw.hproxy.com';
     const proxyPort = '6969';
+    // আপনার দেওয়া ফরম্যাট অনুযায়ী ডাইনামিক ইউজারনেম
     const proxyUser = `oq752bxt5h-country-${selectedCountry}`; 
     const proxyPass = 'drym1t6d71';
 
@@ -85,6 +86,7 @@ async function runSingleVisitor(visitorIndex) {
 
     const page = await browser.newPage();
 
+    // অথেন্টিকেশন নিখুঁতভাবে পাস করার জন্য
     await page.authenticate({
         username: proxyUser,
         password: proxyPass
@@ -171,7 +173,7 @@ async function runSingleVisitor(visitorIndex) {
             if (targetBtn) targetBtn.click();
         });
 
-        // সেশন টাইম: ২৫ থেকে ৩০ সেকেন্ড (25000ms - 30000ms)
+        // ২৫ থেকে ৩০ সেকেন্ড সেশন টাইম
         const randomStayTime = Math.floor(Math.random() * (30000 - 25000 + 1)) + 25000; 
         console.log(`[Visitor ${visitorNum}] Session active. Target duration: ${(randomStayTime / 1000).toFixed(1)} seconds...`);
         
@@ -190,14 +192,14 @@ async function runSingleVisitor(visitorIndex) {
 
             const elapsedTime = Date.now() - startTime;
 
-            // ২০ সেকেন্ডে প্রথম স্ক্রিনশট
+            // ২০ সেকেন্ডে স্ক্রিনশট
             if (elapsedTime >= 20000 && !screenshot20Taken) {
                 screenshot20Taken = true;
                 console.log(`[Visitor ${visitorNum}] Taking 20-second screenshot...`);
                 await page.screenshot({ path: `screenshot_visitor_${visitorNum}_20s.png` });
             }
 
-            // ২৫ সেকেন্ডে দ্বিতীয় স্ক্রিনশট
+            // ২৫ সেকেন্ডে স্ক্রিনশট
             if (elapsedTime >= 25000 && !screenshot25Taken) {
                 screenshot25Taken = true;
                 console.log(`[Visitor ${visitorNum}] Taking 25-second screenshot...`);
@@ -229,7 +231,7 @@ async function runSingleVisitor(visitorIndex) {
 }
 
 async function runVisitorsPool() {
-    console.log(`Starting ${TOTAL_VISITORS} visitors (25-30s session with 20s & 25s screenshots)...\n`);
+    console.log(`Starting ${TOTAL_VISITORS} visitors (US Proxy & 20s/25s Screenshots)...\n`);
     for (let i = 0; i < TOTAL_VISITORS; i++) {
         runSingleVisitor(i);
     }
