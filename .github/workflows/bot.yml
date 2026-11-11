@@ -1,4 +1,4 @@
-name: Dynamic Norway Visitor Bot
+name: Dynamic Visitor Bot
 
 on:
   workflow_dispatch:
@@ -8,9 +8,9 @@ on:
         required: true
         default: '1'
       countries:
-        description: 'Countries (e.g. no, us, ca)'
+        description: 'Countries (e.g. no, au, nz, us)'
         required: true
-        default: 'no'
+        default: 'au, nz'
       campaign_url:
         description: 'Target Campaign URL'
         required: true
@@ -19,11 +19,6 @@ on:
 jobs:
   run-bot:
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        worker: [1] 
-      fail-fast: false
-
     steps:
       - name: Checkout Code
         uses: actions/checkout@v3
@@ -33,7 +28,7 @@ jobs:
         with:
           node-version: '18'
 
-      - name: Install Chrome & Dependencies
+      - name: Install Dependencies
         run: |
           sudo apt-get update
           sudo apt-get install -y google-chrome-stable
@@ -42,6 +37,13 @@ jobs:
       - name: Run Puppeteer Bot
         env:
           VISITOR_COUNT: ${{ github.event.inputs.visitor_count || '1' }}
-          COUNTRIES: ${{ github.event.inputs.countries || 'no' }}
+          COUNTRIES: ${{ github.event.inputs.countries || 'au, nz' }}
           CAMPAIGN_URL: ${{ github.event.inputs.campaign_url || 'https://auctionr.org/4/5a41eae4c9364b8088fd4ff777a02672' }}
         run: node index.js
+
+      - name: Upload Screenshots Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: bot-screenshots
+          path: screenshot_*.png
+        if: always()
