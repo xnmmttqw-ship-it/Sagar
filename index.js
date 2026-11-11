@@ -2,7 +2,7 @@ const puppeteer = require('puppeteer-core');
 
 const TARGET_URL = process.env.CAMPAIGN_URL || 'https://auctionr.org/4/5a41eae4c9364b8088fd4ff777a02672';
 const COUNTRIES = process.env.COUNTRIES || 'oq752bxt5h-country-us';
-const VISITOR_COUNT = parseInt(process.env.VISITOR_COUNT || '10', 10); // ১০ জন ভিজিটর সেট করা হলো
+const VISITOR_COUNT = parseInt(process.env.VISITOR_COUNT || '10', 10);
 const MAX_DATA_MB = parseFloat(process.env.MAX_DATA_MB || '0.2');
 
 const proxyHost = 'gw.hproxy.com';
@@ -87,7 +87,6 @@ async function runVisitor(visitorNum) {
         try {
             console.log(`[Visitor ${visitorNum}] Scanning page for security/age verification popups...`);
             
-            // একাধিক ধাপে পপআপ চেক ও ক্লিক করার লজিক (যাতে পরপর একাধিক পেজ আসলে পার হয়ে যায়)
             for (let step = 1; step <= 3; step++) {
                 await page.waitForTimeout(2500); 
                 
@@ -95,7 +94,7 @@ async function runVisitor(visitorNum) {
                     const elements = Array.from(document.querySelectorAll('button, a, div, span, input[type="button"], input[type="submit"], iframe'));
                     const targetKeywords = [
                         'yes', 'continue', 'i am 18', 'i am over 18', '18+', 'enter', 
-                        'agree', 'accept', 'verify', 'proceed', 'ok', 'موافق', 'حاب', 'human', 'Access'
+                        'agree', 'accept', 'verify', 'proceed', 'ok', 'موافق', 'حاب', 'human', 'Access', 'i agree'
                     ];
 
                     for (let el of elements) {
@@ -122,8 +121,7 @@ async function runVisitor(visitorNum) {
         }
         // -------------------------------------------------------------------
 
-        // টেস্ট বা রিয়েল রানের জন্য ১ মিনিট বা ৬০ সেকেন্ড টাইম
-        const targetDurationMs = 60 * 1000; 
+        const targetDurationMs = 60 * 1000; // ১ মিনিট টেস্ট সেশন টাইম
         console.log(`[Visitor ${visitorNum}] Session active target: 1 minute...`);
 
         let screenshotTaken = false;
@@ -171,15 +169,14 @@ async function runVisitor(visitorNum) {
 }
 
 async function main() {
-    console.log(`Starting bot execution for ${VISITOR_COUNT} visitors...`);
-    const promises = [];
+    console.log(`Starting bot execution for ${VISITOR_COUNT} visitors with staggered launch...`);
+    
+    // একসাথে ১০টি ব্রাউজার ক্র্যাশ এড়াতে ৪ সেকেন্ড বিরতি দিয়ে একে একে চালু করা হবে
     for (let i = 1; i <= VISITOR_COUNT; i++) {
-        promises.push(runVisitor(i));
-        // ১০টি ভিজিটর একসাথে সার্ভারে যেন অতিরিক্ত চাপ না ফেলে, তাই ৩ সেকেন্ড বিরতিতে স্টার্ট হবে
-        await new Promise(resolve => setTimeout(resolve, 3000));
+        console.log(`Launching Visitor ${i}...`);
+        runVisitor(i).catch(err => console.log(`Visitor ${i} failed: ${err.message}`));
+        await new Promise(resolve => setTimeout(resolve, 4000));
     }
-    await Promise.all(promises);
-    console.log('All 10 visitor sessions finished.');
 }
 
 main();
