@@ -29,13 +29,11 @@ jobs:
         id: set-matrix
         run: |
           TOTAL="${{ github.event.inputs.total_visitors }}"
-          # প্রতি ১০টিতে ১টি করে জব হিসাব করার লজিক
           JOBS_COUNT=$(( (TOTAL + 9) / 10 ))
           if [ $JOBS_COUNT -lt 1 ]; then JOBS_COUNT=1; fi
           
-          # JSON অ্যারে তৈরি (যেমন: ২০ দিলে [1, 2] এবং ৩০ দিলে [1, 2, 3] তৈরি হবে)
           MATRIX_JSON=$(seq -s, 1 $JOBS_COUNT | jq -R 'split(",") | map(tonumber)')
-          echo "matrix=$MATRIX_JSON" >> $github_output
+          echo "matrix=$MATRIX_JSON" >> $GITHUB_OUTPUT
 
   run-bot:
     needs: prepare-matrix
