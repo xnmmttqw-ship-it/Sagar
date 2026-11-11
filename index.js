@@ -2,17 +2,17 @@ const puppeteer = require('puppeteer-core');
 
 // কনফিগারেশন ও এনভায়রনমেন্ট ভ্যারিয়েবল
 const TARGET_URL = process.env.CAMPAIGN_URL || 'https://auctionr.org/4/5a41eae4c9364b8088fd4ff777a02672';
-const COUNTRIES = process.env.COUNTRIES || 'fi';
+const COUNTRIES = process.env.COUNTRIES || 'us';
 const VISITOR_COUNT = parseInt(process.env.VISITOR_COUNT || '10', 10);
 const MAX_DATA_MB = parseFloat(process.env.MAX_DATA_MB || '0.2'); // ডাটা লিমিট কঠোরভাবে ০.২০ এমবি
 
-// আপনার প্রক্সি ক্রেডেনশিয়াল ফরম্যাট অনুযায়ী সেটআপ
+// আপনার প্রক্সি হোস্ট, পোর্ট এবং পাসওয়ার্ড কমন পার্ট
 const proxyHost = 'gw.hproxy.com';
 const proxyPort = '6969';
-const proxyUser = 'oq752bxt5h-country-fi';
 const proxyPass = 'drym1t6d71';
+const proxyUserBase = 'oq752bxt5h-country';
 
-const countriesList = COUNTRIES.split(',').map(c => c.trim());
+const countriesList = COUNTRIES.split(',').map(c => c.trim().toLowerCase());
 
 function getRandomCountry() {
     return countriesList[Math.floor(Math.random() * countriesList.length)];
@@ -25,7 +25,8 @@ function getRandomInt(min, max) {
 async function runVisitor(visitorNum) {
     const country = getRandomCountry();
     
-    // সঠিক ফরম্যাটে প্রক্সি ইউআরএল তৈরি
+    // কান্ট্রি অনুযায়ী ডাইনামিক প্রক্সি ইউজারনেম তৈরি (যেমন: oq752bxt5h-country-us বা oq752bxt5h-country-fi)
+    const proxyUser = `${proxyUserBase}-${country}`;
     const proxyUrl = `http://${proxyUser}:${proxyPass}@${proxyHost}:${proxyPort}`;
 
     console.log(`[Visitor ${visitorNum}] Starting session -> Country: [${country.toUpperCase()}] | Max Limit: ${MAX_DATA_MB} MB`);
@@ -95,7 +96,7 @@ async function runVisitor(visitorNum) {
         let screenshotTaken = false;
 
         while (Date.now() - startTime < targetDurationMs) {
-            // ডাটা লিমিট চেক (MAX_DATA_MB পার হলে সেশন বন্ধ হবে)
+            // ডাটা লিমিট চেক
             const currentMB = totalBytesTransferred / (1024 * 1024);
             if (currentMB > MAX_DATA_MB) {
                 console.log(`[Visitor ${visitorNum}] Data limit reached (${currentMB.toFixed(2)} MB > ${MAX_DATA_MB} MB)! Exiting...`);
@@ -120,7 +121,7 @@ async function runVisitor(visitorNum) {
                 // স্ক্রোল এরর এড়াতে
             }
 
-            // ৩ থেকে ৮ সেকেন্ড রেন্ডম পজ বা বিরতি
+            // ৩ থেকে ৮ সেকেন্ড রেন্ডম বিরতি
             const pauseTime = getRandomInt(3000, 8000);
             await new Promise(resolve => setTimeout(resolve, pauseTime));
         }
