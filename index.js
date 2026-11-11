@@ -69,21 +69,33 @@ async function runSingleVisitor(visitorIndex) {
             timeout: 60000 
         });
 
-        const isRobotPopup = await page.evaluate(() => {
-            const text = document.body.innerText || '';
-            return text.includes('I am not a robot') || text.includes('Verify you are human') || text.includes('cf-challenge');
+        // --- ১৮+ পপআপ বা ভেরিফিকেশন চেক ও অটো-ক্লিক হ্যান্ডলিং ---
+        await delay(3000);
+        const handledPopup = await page.evaluate(() => {
+            const allEls = Array.from(document.querySelectorAll('button, a, div, span'));
+            const targetBtn = allEls.find(el => {
+                const text = el.textContent || '';
+                return text.includes('Yes, I\'m over 18') || 
+                       text.includes('Verify you are human') || 
+                       text.includes('I am not a robot') ||
+                       text.includes('Proceed');
+            });
+            if (targetBtn) {
+                targetBtn.click();
+                return true;
+            }
+            return false;
         });
 
-        if (isRobotPopup) {
-            console.log(`[Visitor ${visitorNum}] Captcha/Block detected! Skipping...`);
-            await browser.close();
-            return;
+        if (handledPopup) {
+            console.log(`[Visitor ${visitorNum}] Age verification / Pop-up bypassed successfully!`);
+            await delay(4000); // পপআপ পার হওয়ার পর পেজ লোড হওয়ার জন্য অপেক্ষা
         }
 
         // --- ১০ থেকে ১৫ সেকেন্ড পেজে অবস্থান ও স্ক্রোলিং ---
         console.log(`[Visitor ${visitorNum}] Staying on page for 10-15 seconds...`);
         const startTime = Date.now();
-        const targetStayTime = Math.floor(Math.random() * 5000) + 10000; // ১০ থেকে ১৫ সেকেন্ড র‍্যান্ডম সময়
+        const targetStayTime = Math.floor(Math.random() * 5000) + 10000; 
         let scrollCount = 0;
 
         while (Date.now() - startTime < targetStayTime) {
@@ -111,7 +123,7 @@ async function runSingleVisitor(visitorIndex) {
 
         if (clicked) {
             console.log(`[Visitor ${visitorNum}] Successfully clicked target element.`);
-            await delay(3000); // ক্লিকের পর ৩ সেকেন্ড অপেক্ষা
+            await delay(3000);
         }
 
         console.log(`[Visitor ${visitorNum}] Session completed successfully!`);
