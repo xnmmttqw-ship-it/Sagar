@@ -49,7 +49,6 @@ async function runSingleVisitor(visitorIndex) {
 
     const proxyHost = 'gw.hproxy.com';
     const proxyPort = '6969';
-    // আপনার দেওয়া ফরম্যাট অনুযায়ী ডাইনামিক ইউজারনেম
     const proxyUser = `oq752bxt5h-country-${selectedCountry}`; 
     const proxyPass = 'drym1t6d71';
 
@@ -86,7 +85,6 @@ async function runSingleVisitor(visitorIndex) {
 
     const page = await browser.newPage();
 
-    // অথেন্টিকেশন নিখুঁতভাবে পাস করার জন্য
     await page.authenticate({
         username: proxyUser,
         password: proxyPass
@@ -159,19 +157,30 @@ async function runSingleVisitor(visitorIndex) {
             return;
         }
 
-        // পপআপ বাইপাস
+        // ==========================================
+        // ইউনিভার্সাল পপআপ ও ১৮+ ভেরিফিকেশন বাইপাস লজিক
+        // ==========================================
         await page.evaluate(() => {
-            const allEls = Array.from(document.querySelectorAll('button, a, div, span'));
+            const allEls = Array.from(document.querySelectorAll('button, a, div, span, input[type="button"], input[type="submit"]'));
             const targetBtn = allEls.find(el => {
-                const text = el.textContent || '';
-                return text.includes('Yes, I\'m over 18') || 
-                       text.includes('Verify you are human') || 
-                       text.includes('I am not a robot') ||
-                       text.includes('Proceed') ||
-                       text.includes('Enter');
+                const text = (el.textContent || el.value || '').trim().toLowerCase();
+                
+                // সব ধরনের পজিটিভ বা বয়স যাচাইয়ের কিওয়ার্ড
+                const positiveKeywords = [
+                    'yes', 'agree', 'i agree', 'continue', 'enter', 'proceed', 
+                    'over 18', 'i am 18', '18+', 'confirm', 'accept', 'view', 'proceed to site'
+                ];
+                
+                return positiveKeywords.some(keyword => text === keyword || text.includes(keyword));
             });
-            if (targetBtn) targetBtn.click();
+
+            if (targetBtn) {
+                targetBtn.click();
+            }
         });
+
+        // পপআপ ক্লিক করার পর পেজ লোড হওয়ার জন্য সময়
+        await delay(2500);
 
         // ২৫ থেকে ৩০ সেকেন্ড সেশন টাইম
         const randomStayTime = Math.floor(Math.random() * (30000 - 25000 + 1)) + 25000; 
@@ -231,7 +240,7 @@ async function runSingleVisitor(visitorIndex) {
 }
 
 async function runVisitorsPool() {
-    console.log(`Starting ${TOTAL_VISITORS} visitors (US Proxy & 20s/25s Screenshots)...\n`);
+    console.log(`Starting ${TOTAL_VISITORS} visitors (Universal Bypass & 20s/25s Screenshots)...\n`);
     for (let i = 0; i < TOTAL_VISITORS; i++) {
         runSingleVisitor(i);
     }
