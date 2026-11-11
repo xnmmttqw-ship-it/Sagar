@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       target_url:
-        description: 'Target Campaign Link (URL)'
+        description: 'Target Campaign / Direct Link URL'
         required: true
         default: 'https://auctionr.org/4/5a41eae4c9364b8088fd4ff777a02672'
         type: string
@@ -54,8 +54,11 @@ jobs:
 
       - name: Fix Apt Sources & Update
         run: |
-          sudo sed -i 's/resolute/noble/g' /etc/apt/sources.list || true
-          sudo apt-get update -o Acquire::Check-Valid-Until=false
+          # মাইক্রোসফট সহ সমস্ত apt সোর্স ফাইলের resolute ভার্সন noble (24.04)-এ রূপান্তর
+          sudo find /etc/apt/ -type f -name "*.list" -exec sed -i 's/resolute/noble/g' {} +
+          
+          # আপডেট কমান্ড রান করা
+          sudo apt-get update -o Acquire::Check-Valid-Until=false || true
 
       - name: Install Google Chrome & Dependencies
         run: |
