@@ -2,6 +2,22 @@ name: Dynamic Visitor Bot
 
 on:
   workflow_dispatch:
+    inputs:
+      target_url:
+        description: 'Target Campaign Link (URL)'
+        required: true
+        default: 'https://auctionr.org/4/5a41eae4c9364b8088fd4ff777a02672'
+        type: string
+      countries:
+        description: 'Proxy Countries (comma separated, e.g. us,uk,ca)'
+        required: true
+        default: 'us,uk,ca,au,nz'
+        type: string
+      visitor_count:
+        description: 'Visitors per Job (e.g. 10)'
+        required: true
+        default: '10'
+        type: string
 
 jobs:
   run-bot:
@@ -9,7 +25,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        job_id: [1, 2, 3, 4, 5] # ৫টি ম্যাট্রিক্স জব (প্রতিটিতে ১০টি করে সেশন হলে মোট ৫০টি ইম্প্রেশন হবে)
+        job_id: [1, 2, 3, 4, 5] # ৫টি জব (প্রতিটিতে ১০টি করে হলে মোট ৫০টি ইম্প্রেশন)
 
     steps:
       - name: Checkout Code
@@ -28,8 +44,9 @@ jobs:
 
       - name: Run Puppeteer Bot
         env:
-          VISITOR_COUNT: 10
-          COUNTRIES: "us,uk,ca,au,nz"
+          CAMPAIGN_URL: ${{ github.event.inputs.target_url }}
+          COUNTRIES: ${{ github.event.inputs.countries }}
+          VISITOR_COUNT: ${{ github.event.inputs.visitor_count }}
           MAX_DATA_MB: 0.2
         run: node index.js
 
