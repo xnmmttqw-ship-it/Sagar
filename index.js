@@ -6,7 +6,8 @@ stealth.enabledEvasions.delete('chrome.app');
 stealth.enabledEvasions.delete('iframe.contentWindow');
 puppeteer.use(stealth);
 
-const TOTAL_VISITORS = parseInt(process.env.VISITOR_COUNT) || 1; 
+// গিটহাব অ্যাকশনস ম্যাট্রিক্স ও প্রতি জবের ভিজিটর কনফিগারেশন
+const TOTAL_VISITORS = parseInt(process.env.VISITOR_COUNT) || 10; 
 const TARGET_URL = process.env.CAMPAIGN_URL || 'https://auctionr.org/4/5a41eae4c9364b8088fd4ff777a02672'; 
 const MAX_DATA_MB = parseFloat(process.env.MAX_DATA_MB) || 0.2; 
 
@@ -35,9 +36,6 @@ const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
 async function runSingleVisitor(visitorIndex) {
     const visitorNum = visitorIndex + 1;
-
-    const startDelay = Math.floor(Math.random() * 2000) + 2000;
-    await delay(startDelay);
 
     const selectedCountry = COUNTRY_LIST[Math.floor(Math.random() * COUNTRY_LIST.length)];
     const selectedDevice = DEVICES_POOL[Math.floor(Math.random() * DEVICES_POOL.length)];
@@ -71,7 +69,7 @@ async function runSingleVisitor(visitorIndex) {
                     '--disable-infobars',
                     '--window-position=0,0',
                     '--ignore-certificate-errors',
-                    '--user-data-dir=/tmp/chrome-user-data-' + Math.random() + '-' + Date.now()
+                    '--user-data-dir=/tmp/chrome-user-data-' + visitorNum + '-' + Date.now()
                 ].filter(Boolean)
             });
             break;
@@ -157,20 +155,15 @@ async function runSingleVisitor(visitorIndex) {
             return;
         }
 
-        // ==========================================
-        // ইউনিভার্সাল পপআপ ও ১৮+ ভেরিফিকেশন বাইপাস লজিক
-        // ==========================================
+        // ইউনিভার্সাল পপআপ ও ১৮+ বাইপাস লজিক
         await page.evaluate(() => {
             const allEls = Array.from(document.querySelectorAll('button, a, div, span, input[type="button"], input[type="submit"]'));
             const targetBtn = allEls.find(el => {
                 const text = (el.textContent || el.value || '').trim().toLowerCase();
-                
-                // সব ধরনের পজিটিভ বা বয়স যাচাইয়ের কিওয়ার্ড
                 const positiveKeywords = [
                     'yes', 'agree', 'i agree', 'continue', 'enter', 'proceed', 
                     'over 18', 'i am 18', '18+', 'confirm', 'accept', 'view', 'proceed to site'
                 ];
-                
                 return positiveKeywords.some(keyword => text === keyword || text.includes(keyword));
             });
 
@@ -179,16 +172,16 @@ async function runSingleVisitor(visitorIndex) {
             }
         });
 
-        // পপআপ ক্লিক করার পর পেজ লোড হওয়ার জন্য সময়
         await delay(2500);
 
-        // ২৫ থেকে ৩০ সেকেন্ড সেশন টাইম
-        const randomStayTime = Math.floor(Math.random() * (30000 - 25000 + 1)) + 25000; 
-        console.log(`[Visitor ${visitorNum}] Session active. Target duration: ${(randomStayTime / 1000).toFixed(1)} seconds...`);
+        // ৫ মিনিট (৩০০ সেকেন্ড) থেকে ১০ মিনিট (৬০০ সেকেন্ড) রেন্ডম সেশন টাইম
+        const minTime = 300000; 
+        const maxTime = 600000; 
+        const randomStayTime = Math.floor(Math.random() * (maxTime - minTime + 1)) + minTime; 
+        console.log(`[Visitor ${visitorNum}] Session active. Target duration: ${(randomStayTime / 1000 / 60).toFixed(2)} minutes...`);
         
         const startTime = Date.now();
-        let screenshot20Taken = false;
-        let screenshot25Taken = false;
+        let screenshotTaken = false; // মাত্র ১টি স্ক্রিনশট নেওয়ার জন্য ফ্ল্যাগ
 
         while (Date.now() - startTime < randomStayTime) {
             if (isDataExceeded) {
@@ -201,26 +194,22 @@ async function runSingleVisitor(visitorIndex) {
 
             const elapsedTime = Date.now() - startTime;
 
-            // ২০ সেকেন্ডে স্ক্রিনশট
-            if (elapsedTime >= 20000 && !screenshot20Taken) {
-                screenshot20Taken = true;
-                console.log(`[Visitor ${visitorNum}] Taking 20-second screenshot...`);
-                await page.screenshot({ path: `screenshot_visitor_${visitorNum}_20s.png` });
+            // ঠিক ৩০ সেকেন্ডে মাত্র ১টি স্ক্রিনশট ক্যাপচার করবে
+            if (elapsedTime >= 30000 && !screenshotTaken) {
+                screenshotTaken = true;
+                console.log(`[Visitor ${visitorNum}] Taking 30-second screenshot...`);
+                await page.screenshot({ path: `screenshot_visitor_${visitorNum}_30s.png` });
             }
 
-            // ২৫ সেকেন্ডে স্ক্রিনশট
-            if (elapsedTime >= 25000 && !screenshot25Taken) {
-                screenshot25Taken = true;
-                console.log(`[Visitor ${visitorNum}] Taking 25-second screenshot...`);
-                await page.screenshot({ path: `screenshot_visitor_${visitorNum}_25s.png` });
-            }
-
-            // রেন্ডম স্ক্রোলিং
+            // রিয়েল হিউম্যান-লাইক স্মুথ স্ক্রোলিং ও রেন্ডম পজ
             await page.evaluate(() => {
-                window.scrollBy(0, Math.floor(Math.random() * 150) + 30);
+                const scrollDirection = Math.random() > 0.1 ? 1 : -1; 
+                const scrollDistance = (Math.floor(Math.random() * 200) + 50) * scrollDirection;
+                window.scrollBy({ top: scrollDistance, behavior: 'smooth' });
             });
 
-            await delay(3000);
+            const randomPause = Math.floor(Math.random() * 5000) + 3000;
+            await delay(randomPause);
         }
 
         try {
@@ -240,10 +229,15 @@ async function runSingleVisitor(visitorIndex) {
 }
 
 async function runVisitorsPool() {
-    console.log(`Starting ${TOTAL_VISITORS} visitors (Universal Bypass & 20s/25s Screenshots)...\n`);
+    console.log(`Starting all ${TOTAL_VISITORS} visitors simultaneously...\n`);
+    
+    const visitorsPromises = [];
     for (let i = 0; i < TOTAL_VISITORS; i++) {
-        runSingleVisitor(i);
+        visitorsPromises.push(runSingleVisitor(i));
     }
+    
+    await Promise.all(visitorsPromises);
+    console.log(`All ${TOTAL_VISITORS} visitor sessions completed successfully!`);
 }
 
 runVisitorsPool();
