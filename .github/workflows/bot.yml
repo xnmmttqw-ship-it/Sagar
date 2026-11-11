@@ -2,23 +2,15 @@ name: Dynamic Visitor Bot
 
 on:
   workflow_dispatch:
-    inputs:
-      visitor_count:
-        description: 'Total Visitors'
-        required: true
-        default: '1'
-      countries:
-        description: 'Countries (e.g. no, au, nz, us)'
-        required: true
-        default: 'au, nz'
-      campaign_url:
-        description: 'Target Campaign URL'
-        required: true
-        default: 'https://auctionr.org/4/5a41eae4c9364b8088fd4ff777a02672'
 
 jobs:
   run-bot:
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        job_id: [1, 2, 3, 4, 5] # ৫টি ম্যাট্রিক্স জব (প্রতিটিতে ১০টি করে সেশন হলে মোট ৫০টি ইম্প্রেশন হবে)
+
     steps:
       - name: Checkout Code
         uses: actions/checkout@v3
@@ -36,14 +28,13 @@ jobs:
 
       - name: Run Puppeteer Bot
         env:
-          VISITOR_COUNT: ${{ github.event.inputs.visitor_count || '1' }}
-          COUNTRIES: ${{ github.event.inputs.countries || 'au, nz' }}
-          CAMPAIGN_URL: ${{ github.event.inputs.campaign_url || 'https://auctionr.org/4/5a41eae4c9364b8088fd4ff777a02672' }}
+          VISITOR_COUNT: 10
+          COUNTRIES: "us,uk,ca,au,nz"
+          MAX_DATA_MB: 0.2
         run: node index.js
 
       - name: Upload Screenshots Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: bot-screenshots
+          name: bot-screenshots-job-${{ matrix.job_id }}
           path: screenshot_*.png
-        if: always()
