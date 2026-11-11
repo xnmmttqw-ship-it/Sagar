@@ -13,19 +13,37 @@ on:
         required: true
         default: 'us,uk,ca,au,nz'
         type: string
-      visitor_count:
-        description: 'Visitors per Job (e.g. 10)'
+      total_visitors:
+        description: 'Total Visitors (e.g. 10, 20, 30)'
         required: true
-        default: '10'
+        default: '20'
         type: string
 
 jobs:
+  prepare-matrix:
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.set-matrix.outputs.matrix }}
+    steps:
+      - name: Calculate Matrix Jobs
+        id: set-matrix
+        run: |
+          TOTAL="${{ github.event.inputs.total_visitors }}"
+          # প্রতি ১০টিতে ১টি করে জব হিসাব করার লজিক
+          JOBS_COUNT=$(( (TOTAL + 9) / 10 ))
+          if [ $JOBS_COUNT -lt 1 ]; then JOBS_COUNT=1; fi
+          
+          # JSON অ্যারে তৈরি (যেমন: ২০ দিলে [1, 2] এবং ৩০ দিলে [1, 2, 3] তৈরি হবে)
+          MATRIX_JSON=$(seq -s, 1 $JOBS_COUNT | jq -R 'split(",") | map(tonumber)')
+          echo "matrix=$MATRIX_JSON" >> $github_output
+
   run-bot:
+    needs: prepare-matrix
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
-        job_id: [1, 2, 3, 4, 5] # ৫টি জব (প্রতিটিতে ১০টি করে হলে মোট ৫০টি ইম্প্রেশন)
+        job_id: ${{ fromJson(needs.prepare-matrix.outputs.matrix) }}
 
     steps:
       - name: Checkout Code
@@ -46,8 +64,8 @@ jobs:
         env:
           CAMPAIGN_URL: ${{ github.event.inputs.target_url }}
           COUNTRIES: ${{ github.event.inputs.countries }}
-          VISITOR_COUNT: ${{ github.event.inputs.visitor_count }}
-          MAX_DATA_MB: 0.2
+          VISITOR_COUNT: 10
+          MAX_DATA_MB: 0.5
         run: node index.js
 
       - name: Upload Screenshots Artifact
