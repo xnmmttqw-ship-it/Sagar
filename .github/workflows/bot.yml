@@ -4,17 +4,17 @@ on:
   workflow_dispatch:
     inputs:
       visitor_count:
-        description: 'Total Visitors per Worker'
+        description: 'Total Visitors'
         required: true
-        default: '10'
+        default: '1' # এখানে ১ দিয়ে দিন
 
 jobs:
   run-bot:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        # ১০টি জব সমান্তরালে (Parallel) একসাথে রান করবে
-        worker: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+        # প্রথমে শুধু ১ জন দিয়ে চেক করার জন্য
+        worker: [1] 
       fail-fast: false
 
     steps:
@@ -34,5 +34,5 @@ jobs:
 
       - name: Run Puppeteer Bot
         env:
-          VISITOR_COUNT: ${{ github.event.inputs.visitor_count || '10' }}
+          VISITOR_COUNT: ${{ github.event.inputs.visitor_count || '1' }}
         run: node index.js
