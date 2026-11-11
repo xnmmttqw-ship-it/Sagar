@@ -10,7 +10,7 @@ const TOTAL_VISITORS = parseInt(process.env.VISITOR_COUNT) || 1;
 const TARGET_URL = process.env.CAMPAIGN_URL || 'https://auctionr.org/4/5a41eae4c9364b8088fd4ff777a02672'; 
 const MAX_DATA_MB = parseFloat(process.env.MAX_DATA_MB) || 0.2; 
 
-const RAW_COUNTRIES = process.env.COUNTRIES || 'no';
+const RAW_COUNTRIES = process.env.COUNTRIES || 'au, nz';
 const COUNTRY_LIST = RAW_COUNTRIES.split(',').map(c => c.trim().toLowerCase());
 
 const DEVICES_POOL = [
@@ -36,14 +36,12 @@ const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 async function runSingleVisitor(visitorIndex) {
     const visitorNum = visitorIndex + 1;
 
-    // ডাইনামিক এন্ট্রি ডিলে (৩ থেকে ৫ সেকেন্ড)
-    const startDelay = Math.floor(Math.random() * 3000) + 3000;
+    const startDelay = Math.floor(Math.random() * 2000) + 2000;
     await delay(startDelay);
 
     const selectedCountry = COUNTRY_LIST[Math.floor(Math.random() * COUNTRY_LIST.length)];
     const selectedDevice = DEVICES_POOL[Math.floor(Math.random() * DEVICES_POOL.length)];
 
-    // ডাইনামিক ভিউপোর্ট ভ্যারিয়েশন
     const randomWidth = Math.floor(Math.random() * (390 - 360 + 1)) + 360;
     const randomHeight = Math.floor(Math.random() * (850 - 800 + 1)) + 800;
 
@@ -92,7 +90,6 @@ async function runSingleVisitor(visitorIndex) {
         password: proxyPass
     });
 
-    // হার্ডওয়্যার কনকারেন্সি ও ফিঙ্গারপ্রিন্ট স্পুফিং
     await page.evaluateOnNewDocument(() => {
         Object.defineProperty(navigator, 'hardwareConcurrency', { get: () => 8 });
         Object.defineProperty(navigator, 'deviceMemory', { get: () => 8 });
@@ -105,7 +102,6 @@ async function runSingleVisitor(visitorIndex) {
         };
     });
 
-    // আল্ট্রা ডাটা সেভার মোড (নিখুঁতভাবে শুধু হেভি ফাইল ব্লক করা)
     await page.setRequestInterception(true);
     page.on('request', (interceptedRequest) => {
         const resourceType = interceptedRequest.resourceType();
@@ -119,7 +115,6 @@ async function runSingleVisitor(visitorIndex) {
     let totalBytesDownloaded = 0;
     let isDataExceeded = false;
 
-    // রিয়েল-টাইম ডাটা ট্র্যাকিং এবং ০.২ MB লিমিট এনফোর্সমেন্ট
     page.on('response', async (response) => {
         try {
             const buffer = await response.buffer();
@@ -137,8 +132,8 @@ async function runSingleVisitor(visitorIndex) {
     await page.setUserAgent(selectedDevice.userAgent);
     
     await page.setExtraHTTPHeaders({
-        'Accept-Language': selectedCountry === 'no' ? 'no-NO,no;q=0.9,en-US;q=0.8,en;q=0.7' : 'en-US,en;q=0.9',
-        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
+        'Accept-Language': 'en-US,en;q=0.9',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
         'Sec-Ch-Ua': '"Not_A Brand";v="8", "Chromium";v="122", "Google Chrome";v="122"',
         'Sec-Ch-Ua-Mobile': '?1',
         'Sec-Ch-Ua-Platform': selectedDevice.platformHeader
@@ -150,7 +145,7 @@ async function runSingleVisitor(visitorIndex) {
         console.log(`[Visitor ${visitorNum}] Visiting URL: ${TARGET_URL}`);
         await page.goto(TARGET_URL, { waitUntil: 'networkidle2', timeout: 60000 });
 
-        await delay(3000);
+        await delay(2000);
         const isProxyBlocked = await page.evaluate(() => {
             const text = document.body.innerText || '';
             return text.includes('Anonymous Proxy detected') || text.includes('Access Denied') || text.includes('Blocked');
@@ -176,49 +171,54 @@ async function runSingleVisitor(visitorIndex) {
             if (targetBtn) targetBtn.click();
         });
 
-        // সেশন টাইম র‍্যান্ডমাইজেশন (৪ থেকে ৫ মিনিট)
-        const randomStayMinutes = Math.floor(Math.random() * (300000 - 240000 + 1)) + 240000; 
-        console.log(`[Visitor ${visitorNum}] Session active. Target duration: ${(randomStayMinutes / 60000).toFixed(1)} mins (Max Limit: ${MAX_DATA_MB} MB)...`);
+        // সেশন টাইম: ২৫ থেকে ৩০ সেকেন্ড (25000ms - 30000ms)
+        const randomStayTime = Math.floor(Math.random() * (30000 - 25000 + 1)) + 25000; 
+        console.log(`[Visitor ${visitorNum}] Session active. Target duration: ${(randomStayTime / 1000).toFixed(1)} seconds...`);
         
         const startTime = Date.now();
+        let screenshot20Taken = false;
+        let screenshot25Taken = false;
 
-        while (Date.now() - startTime < randomStayMinutes) {
+        while (Date.now() - startTime < randomStayTime) {
             if (isDataExceeded) {
                 const usedMB = (totalBytesDownloaded / (1024 * 1024)).toFixed(2);
-                console.log(`[Visitor ${visitorNum}] Data limit reached (${usedMB} MB > ${MAX_DATA_MB} MB)! Automatically backing out...`);
-                
+                console.log(`[Visitor ${visitorNum}] Data limit reached (${usedMB} MB > ${MAX_DATA_MB} MB)! Exiting...`);
                 try { await page.goBack(); } catch (e) {}
-                await delay(1000);
                 await browser.close();
                 return;
             }
 
-            // রেন্ডম স্ক্রোলিং এবং টাচ/ক্লিক সিমুলেশন
+            const elapsedTime = Date.now() - startTime;
+
+            // ২০ সেকেন্ডে প্রথম স্ক্রিনশট
+            if (elapsedTime >= 20000 && !screenshot20Taken) {
+                screenshot20Taken = true;
+                console.log(`[Visitor ${visitorNum}] Taking 20-second screenshot...`);
+                await page.screenshot({ path: `screenshot_visitor_${visitorNum}_20s.png` });
+            }
+
+            // ২৫ সেকেন্ডে দ্বিতীয় স্ক্রিনশট
+            if (elapsedTime >= 25000 && !screenshot25Taken) {
+                screenshot25Taken = true;
+                console.log(`[Visitor ${visitorNum}] Taking 25-second screenshot...`);
+                await page.screenshot({ path: `screenshot_visitor_${visitorNum}_25s.png` });
+            }
+
+            // রেন্ডম স্ক্রোলিং
             await page.evaluate(() => {
-                window.scrollBy(0, Math.floor(Math.random() * 200) + 50);
-                
-                if (Math.random() > 0.5) {
-                    const randomElements = document.querySelectorAll('p, span, div, a');
-                    if (randomElements.length > 0) {
-                        const randomEl = randomElements[Math.floor(Math.random() * randomElements.length)];
-                        if (randomEl) {
-                            randomEl.dispatchEvent(new MouseEvent('click', { bubbles: true }));
-                        }
-                    }
-                }
+                window.scrollBy(0, Math.floor(Math.random() * 150) + 30);
             });
 
-            await delay(Math.floor(Math.random() * 3000) + 5000); // ৫ থেকে ৮ সেকেন্ড প্রাকৃতিক বিরতি
+            await delay(3000);
         }
 
-        // ন্যাচারাল এক্সিট
         try {
             await page.evaluate(() => window.history.back());
-            await delay(2000);
+            await delay(1000);
         } catch (e) {}
 
         const totalMB = (totalBytesDownloaded / (1024 * 1024)).toFixed(2);
-        console.log(`[Visitor ${visitorNum}] Session completed naturally! Total Data Used: ${totalMB} MB`);
+        console.log(`[Visitor ${visitorNum}] Session completed! Total Data Used: ${totalMB} MB`);
 
     } catch (error) {
         const totalMB = (totalBytesDownloaded / (1024 * 1024)).toFixed(2);
@@ -229,7 +229,7 @@ async function runSingleVisitor(visitorIndex) {
 }
 
 async function runVisitorsPool() {
-    console.log(`Starting ${TOTAL_VISITORS} visitors with Pro-Level Human Protections & Random Res...\n`);
+    console.log(`Starting ${TOTAL_VISITORS} visitors (25-30s session with 20s & 25s screenshots)...\n`);
     for (let i = 0; i < TOTAL_VISITORS; i++) {
         runSingleVisitor(i);
     }
