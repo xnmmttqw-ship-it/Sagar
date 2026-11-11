@@ -1,45 +1,38 @@
-name: Dynamic Traffic Bot
+name: Dynamic Norway Visitor Bot
 
 on:
   workflow_dispatch:
     inputs:
       visitor_count:
-        description: 'কতজন ভিজিটর পাঠাতে চান?'
+        description: 'Total Visitors per Worker'
         required: true
-        default: '50'
-      country_code:
-        description: 'প্রক্সির কান্ট্রি কোড (যেমন: us, ca)'
-        required: true
-        default: 'us'
-      campaign_url:
-        description: 'ক্যাম্পেইন বা টার্গেট লিংক দিন'
-        required: true
-        default: 'https://auctionr.org/4/5a41eae4c9364b8088fd4ff777a02672'
+        default: '10'
 
 jobs:
-  build:
+  run-bot:
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        # ১০টি জব সমান্তরালে (Parallel) একসাথে রান করবে
+        worker: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+      fail-fast: false
+
     steps:
-      - uses: actions/checkout@v3
+      - name: Checkout Code
+        uses: actions/checkout@v3
 
       - name: Setup Node.js
         uses: actions/setup-node@v3
         with:
           node-version: '18'
-      
-      - name: Install Dependencies
-        run: npm install puppeteer-extra puppeteer-extra-plugin-stealth puppeteer-core
 
-      - name: Run Bot Script
+      - name: Install Chrome & Dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y google-chrome-stable
+          npm install
+
+      - name: Run Puppeteer Bot
         env:
-          VISITOR_COUNT: ${{ github.event.inputs.visitor_count }}
-          COUNTRY_CODE: ${{ github.event.inputs.country_code }}
-          CAMPAIGN_URL: ${{ github.event.inputs.campaign_url }}
+          VISITOR_COUNT: ${{ github.event.inputs.visitor_count || '10' }}
         run: node index.js
-
-      - name: Upload Screenshots as Artifacts
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: bot-screenshots
-          path: '*.png'
