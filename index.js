@@ -21,7 +21,7 @@ const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
 async function runSingleVisitor(visitorIndex) {
     const visitorNum = visitorIndex + 1;
-    console.log(`[Visitor ${visitorNum}] Starting session (Norway Proxy)...`);
+    console.log(`[Visitor ${visitorNum}] Starting session (Data Saver Mode - Norway Proxy)...`);
 
     const proxyHost = 'gw.hproxy.com';
     const proxyPort = '6969';
@@ -53,6 +53,17 @@ async function runSingleVisitor(visitorIndex) {
     await page.authenticate({
         username: proxyUser,
         password: proxyPass
+    });
+
+    // --- ডাটা সাভিং লজিক: ইমেজ, ফন্ট এবং মিডিয়া রিকোয়েস্ট ব্লক করা ---
+    await page.setRequestInterception(true);
+    page.on('request', (interceptedRequest) => {
+        const resourceType = interceptedRequest.resourceType();
+        if (['image', 'font', 'media'].includes(resourceType)) {
+            interceptedRequest.abort(); // এগুলো ডাউনলোড হতে দেবে না, ফলে ডাটা বাঁচবে
+        } else {
+            interceptedRequest.continue(); // মেইন পেজ, স্ক্রিপ্ট এবং অ্যাড/পপআপ কোড রান করতে দেবে
+        }
     });
 
     let totalBytesDownloaded = 0;
@@ -127,9 +138,9 @@ async function runSingleVisitor(visitorIndex) {
         }
 
         // --- ৫ মিনিট পেজে অবস্থান ও স্ক্রোলিং ---
-        console.log(`[Visitor ${visitorNum}] Security cleared. Staying on page for 5 minutes...`);
+        console.log(`[Visitor ${visitorNum}] Security cleared. Staying on page for 5 minutes (Data Saver)...`);
         const startTime = Date.now();
-        const targetStayTime = 5 * 60 * 1000; // ৫ মিনিট (৩০০ সেকেন্ড)
+        const targetStayTime = 5 * 60 * 1000; // ৫ মিনিট
 
         while (Date.now() - startTime < targetStayTime) {
             await page.evaluate(() => window.scrollBy(0, Math.floor(Math.random() * 250) + 100));
@@ -159,7 +170,7 @@ async function runSingleVisitor(visitorIndex) {
         console.log(`[Visitor ${visitorNum}] Final page screenshot captured successfully!`);
 
         const totalMB = (totalBytesDownloaded / (1024 * 1024)).toFixed(2);
-        console.log(`[Visitor ${visitorNum}] Session completed! Total Proxy Data Used: ${totalMB} MB`);
+        console.log(`[Visitor ${visitorNum}] Session completed! Reduced Proxy Data Used: ${totalMB} MB`);
 
     } catch (error) {
         const totalMB = (totalBytesDownloaded / (1024 * 1024)).toFixed(2);
@@ -170,7 +181,7 @@ async function runSingleVisitor(visitorIndex) {
 }
 
 async function runVisitorsPool() {
-    console.log(`Starting ${TOTAL_VISITORS} Norway visitors (Anti-Proxy-Block + 5 mins stay + Final Screenshot) | Pool: ${CONCURRENT_LIMIT}\n`);
+    console.log(`Starting ${TOTAL_VISITORS} Norway visitors (Data Saver Mode + 5 mins stay) | Pool: ${CONCURRENT_LIMIT}\n`);
     
     let currentIndex = 0;
     const workers = [];
