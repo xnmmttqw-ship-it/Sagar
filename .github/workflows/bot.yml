@@ -52,16 +52,9 @@ jobs:
         with:
           node-version: '18'
 
-      - name: Fix Apt Sources & Update
-        run: |
-          # মাইক্রোসফট সহ সমস্ত apt সোর্স ফাইলের resolute ভার্সন noble (24.04)-এ রূপান্তর
-          sudo find /etc/apt/ -type f -name "*.list" -exec sed -i 's/resolute/noble/g' {} +
-          
-          # আপডেট কমান্ড রান করা
-          sudo apt-get update -o Acquire::Check-Valid-Until=false || true
-
       - name: Install Google Chrome & Dependencies
         run: |
+          sudo apt-get update
           sudo apt-get install -y google-chrome-stable
           npm install
 
