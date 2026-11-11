@@ -14,34 +14,14 @@ on:
         default: 'fi'
         type: string
       total_visitors:
-        description: 'Total Visitors (e.g. 10, 20, 30)'
+        description: 'Total Visitors (e.g. 5, 10, 20)'
         required: true
-        default: '20'
+        default: '10'
         type: string
 
 jobs:
-  prepare-matrix:
-    runs-on: ubuntu-latest
-    outputs:
-      matrix: ${{ steps.set-matrix.outputs.matrix }}
-    steps:
-      - name: Calculate Matrix Jobs
-        id: set-matrix
-        run: |
-          TOTAL="${{ github.event.inputs.total_visitors }}"
-          JOBS_COUNT=$(( (TOTAL + 9) / 10 ))
-          if [ $JOBS_COUNT -lt 1 ]; then JOBS_COUNT=1; fi
-          
-          MATRIX_JSON=$(python3 -c "import json; print(json.dumps(list(range(1, $JOBS_COUNT + 1))))")
-          echo "matrix=$MATRIX_JSON" >> $GITHUB_OUTPUT
-
   run-bot:
-    needs: prepare-matrix
     runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        job_id: ${{ fromJson(needs.prepare-matrix.outputs.matrix) }}
 
     steps:
       - name: Checkout Code
@@ -62,12 +42,12 @@ jobs:
         env:
           CAMPAIGN_URL: ${{ github.event.inputs.target_url }}
           COUNTRIES: ${{ github.event.inputs.countries }}
-          VISITOR_COUNT: 10
+          VISITOR_COUNT: ${{ github.event.inputs.total_visitors }}
           MAX_DATA_MB: 0.2
         run: node index.js
 
       - name: Upload Screenshots Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: bot-screenshots-job-${{ matrix.job_id }}
+          name: bot-screenshots
           path: screenshot_*.png
