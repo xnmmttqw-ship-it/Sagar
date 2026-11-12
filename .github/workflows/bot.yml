@@ -1,53 +1,49 @@
-name: Dynamic Visitor Bot
+name: Run Visitor Bot
 
 on:
   workflow_dispatch:
     inputs:
       target_url:
-        description: 'Target Campaign / Direct Link URL'
+        description: 'Target Campaign URL'
         required: true
         default: 'https://auctionr.org/4/5a41eae4c9364b8088fd4ff777a02672'
-        type: string
       countries:
-        description: 'Proxy Countries / Username (e.g. oq752bxt5h-country-us)'
+        description: 'Proxy Countries / Users'
         required: true
         default: 'oq752bxt5h-country-us'
-        type: string
       total_visitors:
-        description: 'Total Visitors (e.g. 5, 10, 20)'
+        description: 'Total Visitors Count'
         required: true
         default: '10'
-        type: string
+      max_mb:
+        description: 'Max Data Limit (MB)'
+        required: true
+        default: '1.0'
+      session_minutes:
+        description: 'Session Duration (Minutes)'
+        required: true
+        default: '5'
 
 jobs:
   run-bot:
     runs-on: ubuntu-latest
-
     steps:
       - name: Checkout Code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Setup Node.js
-        uses: actions/setup-node@v3
+        uses: actions/setup-node@v4
         with:
           node-version: '18'
 
-      - name: Install Dependencies & Verify Chrome
-        run: |
-          # apt-get update বাদ দেওয়া হলো যাতে অতিরিক্ত সময় নষ্ট না হয়
-          sudo apt-get install -y google-chrome-stable || true
-          npm install
+      - name: Install Dependencies
+        run: npm install puppeteer-core
 
-      - name: Run Puppeteer Bot
+      - name: Run Bot Script
         env:
           CAMPAIGN_URL: ${{ github.event.inputs.target_url }}
           COUNTRIES: ${{ github.event.inputs.countries }}
           VISITOR_COUNT: ${{ github.event.inputs.total_visitors }}
-          MAX_DATA_MB: 10
+          MAX_MB: ${{ github.event.inputs.max_mb }}
+          SESSION_MINUTES: ${{ github.event.inputs.session_minutes }}
         run: node index.js
-
-      - name: Upload Screenshots Artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: bot-screenshots
-          path: screenshot_*.png
