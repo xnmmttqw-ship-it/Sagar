@@ -43,7 +43,7 @@ jobs:
           CAMPAIGN_URL: ${{ github.event.inputs.target_url }}
           COUNTRIES: ${{ github.event.inputs.countries }}
           VISITOR_COUNT: ${{ github.event.inputs.total_visitors }}
-          MAX_DATA_MB: 0.2
+          MAX_DATA_MB: 10
         run: node index.js
 
       - name: Upload Screenshots Artifact
