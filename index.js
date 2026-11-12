@@ -3,7 +3,7 @@ const puppeteer = require('puppeteer-core');
 const TARGET_URL = process.env.CAMPAIGN_URL || 'https://auctionr.org/4/5a41eae4c9364b8088fd4ff777a02672';
 const COUNTRIES = process.env.COUNTRIES || 'oq752bxt5h-country-us';
 const VISITOR_COUNT = parseInt(process.env.VISITOR_COUNT || '10', 10);
-const MAX_DATA_MB = parseFloat(process.env.MAX_DATA_MB || '0.2'); // লিমিট ০.২ এমবি করা হলো
+const MAX_DATA_MB = parseFloat(process.env.MAX_DATA_MB || '10.0'); // সর্বোচ্চ ডাটা লিমিট ১০ এমবি
 const MAX_DATA_BYTES = MAX_DATA_MB * 1024 * 1024; 
 
 const proxyHost = 'gw.hproxy.com';
@@ -60,7 +60,7 @@ async function runVisitor(visitorNum) {
         await page.setUserAgent('Mozilla/5.0 (iPhone; CPU iPhone OS 16_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.5 Mobile/15E148 Safari/604.1');
         await page.setViewport({ width: 375, height: 812, isMobile: true });
 
-        // --- রিকোয়েস্ট ফিল্টারিং ও ০.২ এমবি কড়া লিমিট ---
+        // --- রিকোয়েস্ট ফিল্টারিং ও ১০ এমবি কড়া লিমিট ---
         await page.setRequestInterception(true);
         page.on('request', req => {
             if (totalBytesTransferred >= MAX_DATA_BYTES) {
@@ -72,8 +72,7 @@ async function runVisitor(visitorNum) {
             const url = req.url();
 
             if (
-                ['image', 'font', 'stylesheet', 'media', 'manifest'].includes(resourceType) ||
-                url.endsWith('.png') || url.endsWith('.jpg') || url.endsWith('.jpeg') || url.endsWith('.gif') || url.endsWith('.css') ||
+                ['font', 'media', 'manifest'].includes(resourceType) ||
                 url.includes('google-analytics.com') ||
                 url.includes('googletagmanager.com') ||
                 url.includes('facebook.net') ||
@@ -104,9 +103,9 @@ async function runVisitor(visitorNum) {
         try {
             console.log(`[Visitor ${visitorNum}] Scanning page for security/age verification popups...`);
             
-            for (let step = 1; step <= 2; step++) {
+            for (let step = 1; step <= 3; step++) {
                 if (totalBytesTransferred >= MAX_DATA_BYTES) break;
-                await page.waitForTimeout(1500); 
+                await page.waitForTimeout(2000); 
                 
                 const clickedInfo = await page.evaluate(() => {
                     const elements = Array.from(document.querySelectorAll('button, a, div, span, input[type="button"], input[type="submit"]'));
@@ -136,23 +135,33 @@ async function runVisitor(visitorNum) {
             }
         } catch (e) {}
 
-        const targetDurationMs = 30 * 1000; 
-        console.log(`[Visitor ${visitorNum}] Session active target: 30 seconds...`);
+        const targetDurationMs = 60 * 60 * 1000; // ১ ঘণ্টা সেশন টাইম
+        console.log(`[Visitor ${visitorNum}] Session active target: 1 Hour...`);
+
+        let screenshotTaken = false;
 
         while (Date.now() - sessionStartTime < targetDurationMs) {
             if (totalBytesTransferred >= MAX_DATA_BYTES) {
-                console.log(`[Visitor ${visitorNum}] 0.2 MB Data limit reached! Exiting...`);
+                console.log(`[Visitor ${visitorNum}] 10 MB Data limit reached! Exiting...`);
                 break;
             }
 
+            const elapsedTime = Date.now() - sessionStartTime;
+            if (!screenshotTaken && elapsedTime >= 15000) {
+                console.log(`[Visitor ${visitorNum}] Taking screenshot...`);
+                await page.screenshot({ path: `screenshot_visitor_${visitorNum}.png` }).catch(() => {});
+                screenshotTaken = true;
+            }
+
             try {
-                const scrollAmount = getRandomInt(100, 200);
+                const scrollAmount = getRandomInt(100, 300);
                 await page.evaluate((scrollVal) => {
                     window.scrollBy({ top: scrollVal, behavior: 'smooth' });
                 }, scrollAmount);
             } catch (err) {}
 
-            await new Promise(resolve => setTimeout(resolve, 3000));
+            const pauseTime = getRandomInt(4000, 8000);
+            await new Promise(resolve => setTimeout(resolve, pauseTime));
         }
 
         const totalDurationSec = ((Date.now() - sessionStartTime) / 1000).toFixed(1);
@@ -173,12 +182,12 @@ async function runVisitor(visitorNum) {
 }
 
 async function main() {
-    console.log(`Starting bot execution for ${VISITOR_COUNT} visitors (Strict 0.2 MB Limit)...`);
+    console.log(`Starting bot execution for ${VISITOR_COUNT} visitors (10 MB Limit / 1 Hour Target)...`);
     
     for (let i = 1; i <= VISITOR_COUNT; i++) {
         console.log(`Launching Visitor ${i}...`);
         runVisitor(i).catch(err => console.log(`Visitor ${i} failed: ${err.message}`));
-        await new Promise(resolve => setTimeout(resolve, 3000));
+        await new Promise(resolve => setTimeout(resolve, 4000));
     }
 }
 
