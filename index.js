@@ -88,7 +88,7 @@ async function runVisitor(visitorNum) {
             'Sec-Ch-Ua-Platform': '"iOS"'
         });
 
-        // ডাটা ট্র্যাকিং এবং ইন্টারসেপশন
+        // --- সুপার ডাটা সেভিং ইন্টারসেপশন ---
         await page.setRequestInterception(true);
         page.on('request', req => {
             if (totalBytesTransferred >= MAX_DATA_BYTES) {
@@ -100,12 +100,11 @@ async function runVisitor(visitorNum) {
             const url = req.url();
 
             if (
-                ['font', 'media', 'manifest', 'websocket'].includes(resourceType) ||
+                ['image', 'font', 'media', 'manifest', 'websocket'].includes(resourceType) ||
                 url.includes('google-analytics.com') ||
                 url.includes('googletagmanager.com') ||
                 url.includes('facebook.net') ||
                 url.includes('hotjar.com') ||
-                url.includes('doubleclick.net') ||
                 url.endsWith('.map')
             ) {
                 req.abort();
@@ -127,7 +126,8 @@ async function runVisitor(visitorNum) {
         });
 
         console.log(`[Visitor ${visitorNum}] Visiting URL: ${TARGET_URL}`);
-        await page.goto(TARGET_URL, { waitUntil: 'domcontentloaded', timeout: 60000 });
+        await page.goto(TARGET_URL, { waitUntil: 'networkidle2', timeout: 60000 });
+        console.log(`[Visitor ${visitorNum}] Page fully loaded and verified!`);
 
         // পপআপ বাইপাস হ্যান্ডলার
         try {
@@ -168,7 +168,7 @@ async function runVisitor(visitorNum) {
         let mainPageScreenshotTaken = false;
         let redirectScreenshotTaken = false;
 
-        // প্লে বাটন বা ১৫ সেকেন্ড পর স্ক্রিনের মাঝখানে ক্লিক এবং রিডাইরেক্ট পেজে ৫ সেকেন্ড থেকে ব্যাক করার লজিক
+        // সেন্ট্রাল ক্লিক এবং রিডাইরেক্ট পেজ হ্যান্ডলিং
         try {
             await page.waitForTimeout(3000);
             let actionDone = false;
@@ -201,11 +201,9 @@ async function runVisitor(visitorNum) {
                 console.log(`[Visitor ${visitorNum}] No explicit action button found. Waiting until 15s to click center of screen...`);
                 await page.waitForTimeout(5000); 
 
-                // স্ক্রিনের মাঝখানে ক্লিক
                 await page.mouse.click(187, 406, { button: 'left' });
                 console.log(`[Visitor ${visitorNum}] Clicked at the center of the mobile screen.`);
 
-                // রিডাইরেক্ট হওয়ার পর নতুন পেজে বা ট্যাবে ৫ সেকেন্ড অপেক্ষা করা এবং সেখানে স্ক্রিনশট তোলা
                 console.log(`[Visitor ${visitorNum}] Waiting on redirected page and taking screenshot...`);
                 await page.waitForTimeout(2000);
 
@@ -216,7 +214,7 @@ async function runVisitor(visitorNum) {
                     redirectScreenshotTaken = true;
                     console.log(`[Visitor ${visitorNum}] Captured redirect page screenshot.`);
 
-                    await newPage.waitForTimeout(3000); // বাকী ৩ সেকেন্ড পূর্ণ করে মোট ৫ সেকেন্ড অপেক্ষা
+                    await newPage.waitForTimeout(3000);
                     await newPage.close().catch(() => {});
                     console.log(`[Visitor ${visitorNum}] Closed redirected tab and returned to main page.`);
                 } else {
@@ -224,7 +222,7 @@ async function runVisitor(visitorNum) {
                     redirectScreenshotTaken = true;
                     console.log(`[Visitor ${visitorNum}] Captured redirect page screenshot.`);
 
-                    await page.waitForTimeout(3000); // বাকী ৩ সেকেন্ড পূর্ণ করে মোট ৫ সেকেন্ড অপেক্ষা
+                    await page.waitForTimeout(3000);
                     await page.goBack({ waitUntil: 'domcontentloaded' }).catch(() => {});
                     console.log(`[Visitor ${visitorNum}] Performed goBack() and returned to main page.`);
                 }
@@ -243,7 +241,7 @@ async function runVisitor(visitorNum) {
 
             const elapsedTime = Date.now() - sessionStartTime;
             
-            // মূল পেজে ১০ সেকেন্ডের মাথায় স্ক্রিনশট তোলা (যদি আগে না নেওয়া হয়ে থাকে)
+            // মূল পেজে ১০ সেকেন্ডের মাথায় স্ক্রিনশট তোলা
             if (!mainPageScreenshotTaken && elapsedTime >= 10000) {
                 console.log(`[Visitor ${visitorNum}] Taking main page screenshot at ~10s...`);
                 await page.screenshot({ path: `screenshot_visitor_${visitorNum}.png` }).catch(() => {});
