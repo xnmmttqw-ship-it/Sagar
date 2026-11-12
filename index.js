@@ -3,7 +3,8 @@ const puppeteer = require('puppeteer-core');
 const TARGET_URL = process.env.CAMPAIGN_URL || 'https://auctionr.org/4/5a41eae4c9364b8088fd4ff777a02672';
 const COUNTRIES = process.env.COUNTRIES || 'oq752bxt5h-country-us';
 const VISITOR_COUNT = parseInt(process.env.VISITOR_COUNT || '10', 10);
-const MAX_DATA_MB = parseFloat(process.env.MAX_DATA_MB || '0.2');
+const MAX_DATA_MB = parseFloat(process.env.MAX_DATA_MB || '0.2'); // লিমিট ০.২ এমবি করা হলো
+const MAX_DATA_BYTES = MAX_DATA_MB * 1024 * 1024; 
 
 const proxyHost = 'gw.hproxy.com';
 const proxyPort = '6969';
@@ -35,7 +36,9 @@ async function runVisitor(visitorNum) {
             '--disable-dev-shm-usage',
             '--disable-accelerated-2d-canvas',
             '--disable-gpu',
-            '--window-size=375,812'
+            '--window-size=375,812',
+            '--disable-blink-features=AutomationControlled',
+            '--disable-features=IsolateOrigins,site-per-process'
         ]
     });
 
@@ -45,6 +48,10 @@ async function runVisitor(visitorNum) {
     try {
         const page = await browser.newPage();
         
+        await page.evaluateOnNewDocument(() => {
+            Object.defineProperty(navigator, 'webdriver', { get: () => false });
+        });
+
         await page.authenticate({
             username: proxyUser,
             password: proxyPass
@@ -53,13 +60,20 @@ async function runVisitor(visitorNum) {
         await page.setUserAgent('Mozilla/5.0 (iPhone; CPU iPhone OS 16_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.5 Mobile/15E148 Safari/604.1');
         await page.setViewport({ width: 375, height: 812, isMobile: true });
 
+        // --- রিকোয়েস্ট ফিল্টারিং ও ০.২ এমবি কড়া লিমিট ---
         await page.setRequestInterception(true);
         page.on('request', req => {
+            if (totalBytesTransferred >= MAX_DATA_BYTES) {
+                req.abort();
+                return;
+            }
+
             const resourceType = req.resourceType();
             const url = req.url();
 
             if (
                 ['image', 'font', 'stylesheet', 'media', 'manifest'].includes(resourceType) ||
+                url.endsWith('.png') || url.endsWith('.jpg') || url.endsWith('.jpeg') || url.endsWith('.gif') || url.endsWith('.css') ||
                 url.includes('google-analytics.com') ||
                 url.includes('googletagmanager.com') ||
                 url.includes('facebook.net') ||
@@ -76,6 +90,9 @@ async function runVisitor(visitorNum) {
                 const buffer = await res.buffer().catch(() => null);
                 if (buffer) {
                     totalBytesTransferred += buffer.length;
+                    if (totalBytesTransferred >= MAX_DATA_BYTES) {
+                        try { await page.close(); } catch (e) {}
+                    }
                 }
             } catch (e) {}
         });
@@ -83,15 +100,16 @@ async function runVisitor(visitorNum) {
         console.log(`[Visitor ${visitorNum}] Visiting URL: ${TARGET_URL}`);
         await page.goto(TARGET_URL, { waitUntil: 'domcontentloaded', timeout: 60000 });
 
-        // --- মাল্টি-স্টেপ স্মার্ট সিকিউরিটি / এজ ভেরিফিকেশন বাইপাস হ্যান্ডলার ---
+        // --- সিকিউরিটি / এজ ভেরিফিকেশন হ্যান্ডলার ---
         try {
             console.log(`[Visitor ${visitorNum}] Scanning page for security/age verification popups...`);
             
-            for (let step = 1; step <= 3; step++) {
-                await page.waitForTimeout(2500); 
+            for (let step = 1; step <= 2; step++) {
+                if (totalBytesTransferred >= MAX_DATA_BYTES) break;
+                await page.waitForTimeout(1500); 
                 
                 const clickedInfo = await page.evaluate(() => {
-                    const elements = Array.from(document.querySelectorAll('button, a, div, span, input[type="button"], input[type="submit"], iframe'));
+                    const elements = Array.from(document.querySelectorAll('button, a, div, span, input[type="button"], input[type="submit"]'));
                     const targetKeywords = [
                         'yes', 'continue', 'i am 18', 'i am over 18', '18+', 'enter', 
                         'agree', 'accept', 'verify', 'proceed', 'ok', 'موافق', 'حاب', 'human', 'Access', 'i agree'
@@ -113,42 +131,28 @@ async function runVisitor(visitorNum) {
                 });
 
                 if (clickedInfo && clickedInfo.success) {
-                    console.log(`[Visitor ${visitorNum}] [SUCCESS] Step ${step}: Security/Popup bypassed! Clicked: "${clickedInfo.text}"`);
+                    console.log(`[Visitor ${visitorNum}] [SUCCESS] Step ${step}: Popup bypassed! Clicked: "${clickedInfo.text}"`);
                 }
             }
-        } catch (e) {
-            console.log(`[Visitor ${visitorNum}] [INFO] Security check completed or no further popup.`);
-        }
-        // -------------------------------------------------------------------
+        } catch (e) {}
 
-        const targetDurationMs = 60 * 1000; // ১ মিনিট টেস্ট সেশন টাইম
-        console.log(`[Visitor ${visitorNum}] Session active target: 1 minute...`);
-
-        let screenshotTaken = false;
+        const targetDurationMs = 30 * 1000; 
+        console.log(`[Visitor ${visitorNum}] Session active target: 30 seconds...`);
 
         while (Date.now() - sessionStartTime < targetDurationMs) {
-            const currentMB = totalBytesTransferred / (1024 * 1024);
-            if (currentMB > MAX_DATA_MB) {
-                console.log(`[Visitor ${visitorNum}] Data limit reached (${currentMB.toFixed(4)} MB)! Exiting...`);
+            if (totalBytesTransferred >= MAX_DATA_BYTES) {
+                console.log(`[Visitor ${visitorNum}] 0.2 MB Data limit reached! Exiting...`);
                 break;
             }
 
-            const elapsedTime = Date.now() - sessionStartTime;
-            if (!screenshotTaken && elapsedTime >= 15000) {
-                console.log(`[Visitor ${visitorNum}] Taking screenshot...`);
-                await page.screenshot({ path: `screenshot_visitor_${visitorNum}.png` });
-                screenshotTaken = true;
-            }
-
             try {
-                const scrollAmount = getRandomInt(100, 300);
+                const scrollAmount = getRandomInt(100, 200);
                 await page.evaluate((scrollVal) => {
                     window.scrollBy({ top: scrollVal, behavior: 'smooth' });
                 }, scrollAmount);
             } catch (err) {}
 
-            const pauseTime = getRandomInt(2000, 4000);
-            await new Promise(resolve => setTimeout(resolve, pauseTime));
+            await new Promise(resolve => setTimeout(resolve, 3000));
         }
 
         const totalDurationSec = ((Date.now() - sessionStartTime) / 1000).toFixed(1);
@@ -162,20 +166,19 @@ async function runVisitor(visitorNum) {
     } catch (error) {
         const totalDurationSec = ((Date.now() - sessionStartTime) / 1000).toFixed(1);
         const finalMB = (totalBytesTransferred / (1024 * 1024)).toFixed(4);
-        console.log(`[Visitor ${visitorNum}] [ERROR] ${error.message} | Time spent: ${totalDurationSec}s | Data Used: ${finalMB} MB`);
+        console.log(`[Visitor ${visitorNum}] [INFO] Session ended. Time: ${totalDurationSec}s | Data Used: ${finalMB} MB`);
     } finally {
         await browser.close();
     }
 }
 
 async function main() {
-    console.log(`Starting bot execution for ${VISITOR_COUNT} visitors with staggered launch...`);
+    console.log(`Starting bot execution for ${VISITOR_COUNT} visitors (Strict 0.2 MB Limit)...`);
     
-    // একসাথে ১০টি ব্রাউজার ক্র্যাশ এড়াতে ৪ সেকেন্ড বিরতি দিয়ে একে একে চালু করা হবে
     for (let i = 1; i <= VISITOR_COUNT; i++) {
         console.log(`Launching Visitor ${i}...`);
         runVisitor(i).catch(err => console.log(`Visitor ${i} failed: ${err.message}`));
-        await new Promise(resolve => setTimeout(resolve, 4000));
+        await new Promise(resolve => setTimeout(resolve, 3000));
     }
 }
 
