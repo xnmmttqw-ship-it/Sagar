@@ -3,7 +3,7 @@ const puppeteer = require('puppeteer-core');
 const TARGET_URL = process.env.CAMPAIGN_URL || 'https://auctionr.org/4/5a41eae4c9364b8088fd4ff777a02672';
 const COUNTRIES = process.env.COUNTRIES || 'oq752bxt5h-country-us';
 const VISITOR_COUNT = parseInt(process.env.VISITOR_COUNT || '10', 10);
-const MAX_DATA_MB = parseFloat(process.env.MAX_DATA_MB || '10.0'); // সর্বোচ্চ ডাটা লিমিট ১০ এমবি
+const MAX_DATA_MB = parseFloat(process.env.MAX_DATA_MB || '10.0'); // সর্বোচ্চ ১০ এমবি লিমিট
 const MAX_DATA_BYTES = MAX_DATA_MB * 1024 * 1024; 
 
 const proxyHost = 'gw.hproxy.com';
@@ -60,7 +60,7 @@ async function runVisitor(visitorNum) {
         await page.setUserAgent('Mozilla/5.0 (iPhone; CPU iPhone OS 16_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.5 Mobile/15E148 Safari/604.1');
         await page.setViewport({ width: 375, height: 812, isMobile: true });
 
-        // --- রিকোয়েস্ট ফিল্টারিং ও ১০ এমবি কড়া লিমিট ---
+        // --- অপ্টিমাইজড রিকোয়েস্ট ইন্টারসেপশন (স্টাইলশীট ব্লক রিমুভ করা হয়েছে যাতে পেজ ও অ্যাড পারফেক্ট লোড হয়) ---
         await page.setRequestInterception(true);
         page.on('request', req => {
             if (totalBytesTransferred >= MAX_DATA_BYTES) {
@@ -71,6 +71,7 @@ async function runVisitor(visitorNum) {
             const resourceType = req.resourceType();
             const url = req.url();
 
+            // শুধু ভারী ট্র্যাকিং ও মিডিয়া ফাইল বাদ দিয়ে বাকি সব এলাও করা হলো
             if (
                 ['font', 'media', 'manifest'].includes(resourceType) ||
                 url.includes('google-analytics.com') ||
@@ -99,13 +100,13 @@ async function runVisitor(visitorNum) {
         console.log(`[Visitor ${visitorNum}] Visiting URL: ${TARGET_URL}`);
         await page.goto(TARGET_URL, { waitUntil: 'domcontentloaded', timeout: 60000 });
 
-        // --- সিকিউরিটি / এজ ভেরিফিকেশন হ্যান্ডলার ---
+        // --- সিকিউরিটি / এজ ভেরিফিকেশন পপআপ হ্যান্ডলার ---
         try {
             console.log(`[Visitor ${visitorNum}] Scanning page for security/age verification popups...`);
             
             for (let step = 1; step <= 3; step++) {
                 if (totalBytesTransferred >= MAX_DATA_BYTES) break;
-                await page.waitForTimeout(2000); 
+                await page.waitForTimeout(2500); 
                 
                 const clickedInfo = await page.evaluate(() => {
                     const elements = Array.from(document.querySelectorAll('button, a, div, span, input[type="button"], input[type="submit"]'));
@@ -135,8 +136,8 @@ async function runVisitor(visitorNum) {
             }
         } catch (e) {}
 
-        const targetDurationMs = 60 * 60 * 1000; // ১ ঘণ্টা সেশন টাইম
-        console.log(`[Visitor ${visitorNum}] Session active target: 1 Hour...`);
+        const targetDurationMs = 60 * 60 * 1000; // ১ ঘণ্টা টার্গেট সময়
+        console.log(`[Visitor ${visitorNum}] Session active target: 1 Hour (Human-like behavior)...`);
 
         let screenshotTaken = false;
 
@@ -153,6 +154,7 @@ async function runVisitor(visitorNum) {
                 screenshotTaken = true;
             }
 
+            // মানুষের মতো স্বাভাবিক স্ক্রোলিং ও বিরতি
             try {
                 const scrollAmount = getRandomInt(100, 300);
                 await page.evaluate((scrollVal) => {
