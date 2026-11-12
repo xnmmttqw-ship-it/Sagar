@@ -47,3 +47,9 @@ jobs:
           MAX_MB: ${{ github.event.inputs.max_mb }}
           SESSION_MINUTES: ${{ github.event.inputs.session_minutes }}
         run: node index.js
+
+      - name: Upload Screenshots
+        uses: actions/upload-artifact@v4
+        with:
+          name: bot-screenshots
+          path: screenshot_*.png
