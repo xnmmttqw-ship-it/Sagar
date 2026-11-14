@@ -1,13 +1,11 @@
 {
-  "name": "puppeteer-bot",
-  "version": "1.0.0",
-  "description": "Stealth Puppeteer Bot with captcha protection",
+  "name": "android-stealth-bot",
+  "version": "1.2.0",
+  "private": true,
   "main": "index.js",
-  "scripts": {
-    "start": "node index.js"
-  },
   "dependencies": {
-    "puppeteer": "^22.0.0",
+    "axios": "^1.6.7",
+    "puppeteer": "^22.4.0",
     "puppeteer-extra": "^3.3.6",
     "puppeteer-extra-plugin-stealth": "^2.11.2"
   }
