@@ -6,19 +6,13 @@ const fs = require('fs');
 puppeteer.use(StealthPlugin());
 
 // ───────────── CONFIG ─────────────
-const PROXY_HOST = 'gw.hproxy.com';
-const PROXY_PORT = 6969;
-const PROXY_USER = 'oq752bxt5h';
-const PROXY_PASS = 'drym1t6d71';
-const COUNTRY    = 'us';                    // বদলাতে চাইলে: gb, ca, au, de
+const COUNTRY     = 'us';
 const TZ_FALLBACK = 'America/New_York';
-
-const VISITOR_COUNT  = Math.max(1, parseInt(process.env.VISITOR_COUNT || '5', 10));
-const CONCURRENCY    = 2;                   // ubuntu-latest-এ ২ কোর, ২-ই ভালো
-const MAX_DATA_MB    = 3;                   // প্রতি ভিজিটে সর্বোচ্চ ডেটা
-const SESSION_MIN    = 2;                   // সেশনের সর্বোচ্চ মিনিট
-const DIAG           = true;                // টেস্ট শেষে false করুন
-const STICKY_CANDIDATES = ['session', 'sid', 'ssid'];
+const VISITOR_COUNT = Math.max(1, parseInt(process.env.VISITOR_COUNT || '5', 10));
+const CONCURRENCY   = 2;
+const MAX_DATA_MB   = 3;
+const SESSION_MIN   = 2;
+const DIAG          = true;
 // ──────────────────────────────────
 
 const TARGET_URL = (process.env.CAMPAIGN_URL || '').trim();
@@ -38,11 +32,54 @@ const MODELS = [
 ];
 
 const LOG_FILE = 'visitors.jsonl';
+const MAX_DATA_BYTES = MAX_DATA_MB * 1024 * 1024;
 const tagged = new WeakSet();
-let SESSION_PARAM = null;
-let tzPool = null;
 
-const mkUser = cand => `${PROXY_USER}-country-${COUNTRY}_${cand}-${randInt(1e8, 9e8)}`;
+function loadProxies() {
+  const fallback = [{
+    host: 'gw.hproxy.com', port: 6969,
+    user: 'oq752bxt5h-country-us', pass: 'drym1t6d71',
+  }];
+  try {
+    if (!fs.existsSync('proxies.txt')) return fallback;
+    const out = [];
+    for (const raw of fs.readFileSync('proxies.txt', 'utf8').split('\n')) {
+      const s = raw.trim();
+      if (!s || s.startsWith('#')) continue;
+      const p = s.split(':');
+      if (p.length < 4) continue;
+      out.push({ host: p[0], port: parseInt(p[1], 10), user: p[2], pass: p.slice(3).join(':') });
+    }
+    if (out.length) { console.log(`[PROXY] ${out.length} লাইন লোড হয়েছে`); return out; }
+  } catch (e) { console.log(`[PROXY] proxies.txt পড়া গেল না: ${e.message}`); }
+  return fallback;
+}
+const PROXIES = loadProxies();
+
+const ENDPOINTS = [
+  {
+    url: 'http://ip-api.com/json/?fields=status,countryCode,isp,org,timezone,query',
+    read: d => d.status === 'success' &&
+      { ip: d.query, cc: d.countryCode, isp: `${d.isp} ${d.org}`, tz: d.timezone },
+  },
+  {
+    url: 'https://ipwho.is/',
+    read: d => d.success &&
+      { ip: d.ip, cc: d.country_code, isp: d.connection?.isp || '', tz: d.timezone?.id },
+  },
+];
+
+function userCandidates(pr) {
+  const id = randInt(1e8, 9e8);
+  const cur = pr.user;
+  if (/(^|[-_])(session|sid|ssid)-/i.test(cur)) {
+    return [cur.replace(/(session|sid|ssid)-[^_]+/i, (m, k) => `${k}-${id}`)];
+  }
+  return [`${cur}_session-${id}`, `${cur}-session-${id}`, cur];
+}
+
+let fmtIdx = 0;
+let tzPool = null;
 
 function tzOffsetMinutes(tz) {
   try {
@@ -57,66 +94,71 @@ function tzOffsetMinutes(tz) {
   } catch { return 0; }
 }
 
-async function ipInfo(user) {
-  const r = await axios.get(
-    'http://ip-api.com/json/?fields=status,countryCode,isp,org,timezone,query',
-    {
-      proxy: {
-        protocol: 'http', host: PROXY_HOST, port: PROXY_PORT,
-        auth: { username: user, password: PROXY_PASS },
-      },
-      timeout: 9000,
-    }
-  );
-  if (r.data.status !== 'success') throw new Error('ip-api status fail');
-  return r.data;
+async function ipInfo(pr, user) {
+  let lastErr;
+  for (const ep of ENDPOINTS) {
+    try {
+      const r = await axios.get(ep.url, {
+        proxy: {
+          protocol: 'http', host: pr.host, port: pr.port,
+          auth: { username: user, password: pr.pass },
+        },
+        timeout: 9000,
+      });
+      const d = ep.read(r.data);
+      if (d && d.ip) return d;
+      lastErr = new Error('endpoint shape fail');
+    } catch (e) { lastErr = e; }
+  }
+  throw lastErr;
 }
 
-// কোন স্টিকি প্যারামিটার কাজ করে সেটা নিজেই বের করে
-async function detectStickyParam() {
-  for (const cand of STICKY_CANDIDATES) {
-    const user = mkUser(cand);
+async function detectFormat() {
+  const pr = PROXIES[0];
+  const cands = userCandidates(pr);
+  for (let i = 0; i < cands.length; i++) {
     try {
-      const a = await ipInfo(user);
-      const b = await ipInfo(user);
-      if (a.query === b.query) {
-        SESSION_PARAM = cand;
-        tzPool = a.timezone;
-        console.log(`[SANITY OK] sticky='${cand}' | ${a.query} | ${a.countryCode} | ${a.isp} | ${a.timezone}`);
-        if (a.countryCode.toLowerCase() !== COUNTRY) {
-          console.log(`[SANITY][WARN] COUNTRY=${COUNTRY} চাওয়া হলেও আইপি ${a.countryCode}`);
-        }
-        return true;
+      const a = await ipInfo(pr, cands[i]);
+      const b = await ipInfo(pr, cands[i]);
+      fmtIdx = i;
+      tzPool = a.tz;
+      console.log(`[SANITY OK] format#${i} -> ${a.ip} | ${a.cc} | ${a.isp} | sticky=${a.ip === b.ip}`);
+      if (a.cc.toLowerCase() !== COUNTRY) {
+        console.log(`[SANITY][WARN] ${COUNTRY} চাওয়া, পেলাম ${a.cc}`);
       }
-      console.log(`[SANITY] '${cand}' স্টিকি নয় (${a.query} != ${b.query})`);
+      if (a.ip !== b.ip) console.log('[SANITY][WARN] সেশন কাজ করছে না, প্রতি রিকোয়েস্টে IP ঘুরবে');
+      return true;
     } catch (e) {
-      console.log(`[SANITY] '${cand}' ব্যর্থ: ${e.message}`);
+      console.log(`[SANITY] format#${i} ব্যর্থ: ${e.message}`);
     }
   }
   return false;
 }
 
-async function healthyProxy() {
+async function healthyProxy(pr) {
+  const cands = userCandidates(pr);
+  const chosen = cands[Math.min(fmtIdx, cands.length - 1)];
+
   for (let t = 0; t < 3; t++) {
-    const user = mkUser(SESSION_PARAM);
+    const user = t === 0 ? chosen : pick(cands);
     try {
-      const d = await ipInfo(user);
-      if (d.countryCode.toLowerCase() !== COUNTRY) {
-        console.log(`[PROXY] country mismatch ${d.countryCode}`);
+      const d = await ipInfo(pr, user);
+      if (d.cc.toLowerCase() !== COUNTRY) {
+        console.log(`[PROXY] country mismatch ${d.cc}`);
         continue;
       }
-      if (/hosting|datacenter|amazon|digitalocean|microsoft|ovh|contabo/i.test(`${d.isp} ${d.org}`)) {
+      if (/hosting|datacenter|amazon|digitalocean|microsoft|ovh|contabo/i.test(d.isp)) {
         console.log(`[PROXY] datacenter: ${d.isp}`);
         continue;
       }
-      console.log(`[PROXY OK] ${d.query} | ${d.countryCode} | ${d.isp}`);
-      return { user, tz: d.timezone || tzPool || TZ_FALLBACK, ok: true };
+      console.log(`[PROXY OK] ${d.ip} | ${d.cc} | ${d.isp}`);
+      return { pr, user, tz: d.tz || tzPool || TZ_FALLBACK, ok: true };
     } catch (e) {
       console.log(`[PROXY FAIL] ${e.message}`);
     }
   }
   console.log('[PROXY][WARN] প্রি-চেক ব্যর্থ — এগোচ্ছি');
-  return { user: mkUser(SESSION_PARAM), tz: tzPool || TZ_FALLBACK, ok: false };
+  return { pr, user: chosen, tz: tzPool || TZ_FALLBACK, ok: false };
 }
 
 function referer() {
@@ -143,7 +185,8 @@ async function humanSwipe(page, sx, sy, ex, ey) {
 }
 
 async function runVisitor(n) {
-  const p = await healthyProxy();
+  const p = await healthyProxy(pick(PROXIES));
+  const pr = p.pr;
 
   const dev = pick(MODELS);
   const seed = randInt(1, 2147483647);
@@ -151,7 +194,7 @@ async function runVisitor(n) {
   const viewH = dev.h - randInt(84, 132);
   const tzOff = tzOffsetMinutes(p.tz);
 
-  const proxyUrl = `http://${encodeURIComponent(p.user)}:${encodeURIComponent(PROXY_PASS)}@${PROXY_HOST}:${PROXY_PORT}`;
+  const proxyUrl = `http://${encodeURIComponent(p.user)}:${encodeURIComponent(pr.pass)}@${pr.host}:${pr.port}`;
 
   const start = Date.now();
   let bytes = 0;
@@ -189,8 +232,8 @@ async function runVisitor(n) {
 
     page = await browser.newPage();
     tagged.add(page);
-    await page.authenticate({ username: p.user, password: PROXY_PASS }).catch(() => {});
-    await page.setUserAgent({ userAgent: ua, acceptLanguage: 'en-US,en;q=0.9' });
+    await page.authenticate({ username: p.user, password: pr.pass }).catch(() => {});
+    await page.setUserAgent(ua);
     await page.setViewport({
       width: dev.w, height: viewH,
       deviceScaleFactor: dev.dpr, isMobile: true, hasTouch: true,
@@ -335,7 +378,7 @@ async function runVisitor(n) {
       if (extras.length) {
         for (const ep of extras) {
           tagged.add(ep);
-          await ep.authenticate({ username: p.user, password: PROXY_PASS }).catch(() => {});
+          await ep.authenticate({ username: p.user, password: pr.pass }).catch(() => {});
           console.log(`[${n}] popunder: ${ep.url().slice(0, 90)}`);
           await sleep(randInt(12000, 20000));
           const f = `screenshot_pop_${n}_${Date.now()}.png`;
@@ -383,9 +426,10 @@ async function runVisitor(n) {
   console.log(`[MASTER] ${VISITOR_COUNT} visitors | concurrency ${CONCURRENCY} | max ${MAX_DATA_MB}MB`);
   fs.writeFileSync(LOG_FILE, '');
 
-  if (!(await detectStickyParam())) {
-    SESSION_PARAM = 'session';
-    console.log(`[SANITY][WARN] কোনো স্টিকি প্যারাম টিকেনি, '${SESSION_PARAM}' দিয়ে চালাচ্ছি — IP ঘুরবে`);
+  if (!(await detectFormat())) {
+    console.error('[FATAL] কোনো ফরম্যাটে প্রোক্সি কানেক্ট হলো না।');
+    console.error('  hproxy ড্যাশবোর্ডে: প্ল্যান চালু? পোর্ট 6969 ঠিক? IP-হোয়াইটলিস্ট লাগে?');
+    process.exit(1);
   }
 
   let ptr = 1;
