@@ -3,36 +3,51 @@ name: Android Stealth Bot
 on:
   workflow_dispatch:
     inputs:
-      target_url:     { description: 'Campaign URL', required: true, type: string }
-      total_visitors: { description: 'TOTAL visitors', required: true, default: '5', type: string }
+      target_url:
+        description: 'Target Campaign URL'
+        required: true
+        type: string
+      countries:
+        description: 'Proxy Country User (যেমন: oq752bxt5h-country-us)'
+        required: true
+        default: 'oq752bxt5h-country-us'
+        type: string
+      total_visitors:
+        description: 'Total Visitors Count'
+        required: true
+        default: '5'
+        type: string
 
 jobs:
-  run:
-    runs-on: ubuntu-latest
+  run-bot:
+    runs-on: windows-latest
     timeout-minutes: 340
-    steps:
-      - uses: actions/checkout@v4
 
-      - uses: actions/setup-node@v4
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
         with:
           node-version: '20'
 
-      - name: Install deps
-        env:
-          PUPPETEER_SKIP_DOWNLOAD: '1'
+      - name: Install Dependencies
         run: npm install --no-audit --no-fund
 
-      - name: Run bot
+      - name: Execute Stealth Bot
         env:
           CAMPAIGN_URL: ${{ github.event.inputs.target_url }}
+          COUNTRY_INPUT: ${{ github.event.inputs.countries }}
           VISITOR_COUNT: ${{ github.event.inputs.total_visitors }}
+          PROXY_PASS: ${{ secrets.PROXY_PASS }}
         run: node index.js
 
-      - name: Upload evidence
+      - name: Upload Evidence Artifacts
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: run-${{ github.run_id }}
+          name: bot-evidence-${{ github.run_id }}
           path: |
             screenshot_*.png
             visitors.jsonl
