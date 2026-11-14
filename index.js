@@ -6,7 +6,8 @@ const fs = require('fs');
 puppeteer.use(StealthPlugin());
 
 // ───────────── CONFIG ─────────────
-const COUNTRY     = 'us';
+const COUNTRY_INPUT = (process.env.COUNTRY_INPUT || 'oq752bxt5h-country-us').trim();
+const COUNTRY     = COUNTRY_INPUT.includes('-country-') ? COUNTRY_INPUT.split('-country-')[1].toLowerCase() : 'us';
 const TZ_FALLBACK = 'America/New_York';
 const VISITOR_COUNT = Math.max(1, parseInt(process.env.VISITOR_COUNT || '5', 10));
 const CONCURRENCY   = 2;
@@ -38,7 +39,7 @@ const tagged = new WeakSet();
 function loadProxies() {
   const fallback = [{
     host: 'gw.hproxy.com', port: 6969,
-    user: 'oq752bxt5h-country-us', pass: 'drym1t6d71',
+    user: COUNTRY_INPUT, pass: process.env.PROXY_PASS || 'drym1t6d71',
   }];
   try {
     if (!fs.existsSync('proxies.txt')) return fallback;
@@ -194,8 +195,6 @@ async function runVisitor(n) {
   const viewH = dev.h - randInt(84, 132);
   const tzOff = tzOffsetMinutes(p.tz);
 
-  const proxyUrl = `http://${encodeURIComponent(p.user)}:${encodeURIComponent(pr.pass)}@${pr.host}:${pr.port}`;
-
   const start = Date.now();
   let bytes = 0;
   let capped = false;
@@ -204,11 +203,11 @@ async function runVisitor(n) {
   const shots = [];
 
   try {
+    // পরিবর্তন ১ ও ৪: --proxy-server থেকে ইউজার:পাস বাদ দেওয়া হয়েছে এবং হার্ডকোডেড লিনাক্স পাথ সরানো হয়েছে
     browser = await puppeteer.launch({
-      executablePath: '/usr/bin/google-chrome',
       headless: 'new',
       args: [
-        `--proxy-server=${proxyUrl}`,
+        `--proxy-server=${pr.host}:${pr.port}`,
         '--ignore-certificate-errors',
         '--no-sandbox',
         '--disable-setuid-sandbox',
@@ -232,7 +231,12 @@ async function runVisitor(n) {
 
     page = await browser.newPage();
     tagged.add(page);
-    await page.authenticate({ username: p.user, password: pr.pass }).catch(() => {});
+
+    // পরিবর্তন ২: পাপেটিয়ারের নিজস্ব authenticate মেথড দিয়ে নিরাপদে প্রক্সি লগইন
+    await page.authenticate({ username: p.user, password: pr.pass }).catch(e => {
+      console.log(`[${n}] Auth Error: ${e.message}`);
+    });
+
     await page.setUserAgent(ua);
     await page.setViewport({
       width: dev.w, height: viewH,
@@ -372,6 +376,7 @@ async function runVisitor(n) {
     await sleep(randInt(300, 900));
     await page.mouse.click(randInt(120, dev.w - 120), randInt(240, viewH - 200)).catch(() => {});
 
+    // পরিবর্তন ৩: নতুন পপআন্ডার ট্যাবগুলোতেও প্রক্সি অথেন্টিকেশন নিশ্চিত করা
     for (let i = 0; i < 10; i++) {
       await sleep(500);
       const extras = (await browser.pages()).filter(pg => !tagged.has(pg));
@@ -379,6 +384,7 @@ async function runVisitor(n) {
         for (const ep of extras) {
           tagged.add(ep);
           await ep.authenticate({ username: p.user, password: pr.pass }).catch(() => {});
+          await sleep(1500);
           console.log(`[${n}] popunder: ${ep.url().slice(0, 90)}`);
           await sleep(randInt(12000, 20000));
           const f = `screenshot_pop_${n}_${Date.now()}.png`;
