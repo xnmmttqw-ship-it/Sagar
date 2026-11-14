@@ -1,55 +1,40 @@
-name: Run Visitor Bot
+name: Android Stealth Bot
 
 on:
   workflow_dispatch:
     inputs:
-      target_url:
-        description: 'Target Campaign URL'
-        required: true
-        default: 'https://auctionr.org/4/5a41eae4c9364b8088fd4ff777a02672'
-      countries:
-        description: 'Proxy Countries / Users'
-        required: true
-        default: 'oq752bxt5h-country-us'
-      total_visitors:
-        description: 'Total Visitors Count'
-        required: true
-        default: '10'
-      max_mb:
-        description: 'Max Data Limit (MB)'
-        required: true
-        default: '1.0'
-      session_minutes:
-        description: 'Session Duration (Minutes)'
-        required: true
-        default: '5'
+      target_url:     { description: 'Campaign URL', required: true, type: string }
+      total_visitors: { description: 'TOTAL visitors', required: true, default: '5', type: string }
 
 jobs:
-  run-bot:
+  run:
     runs-on: ubuntu-latest
+    timeout-minutes: 340
     steps:
-      - name: Checkout Code
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
+      - uses: actions/setup-node@v4
         with:
-          node-version: '18'
+          node-version: '20'
 
-      - name: Install Dependencies
-        run: npm install puppeteer-core
+      - name: Install deps
+        env:
+          PUPPETEER_SKIP_DOWNLOAD: '1'
+        run: npm install --no-audit --no-fund
 
-      - name: Run Bot Script
+      - name: Run bot
         env:
           CAMPAIGN_URL: ${{ github.event.inputs.target_url }}
-          COUNTRIES: ${{ github.event.inputs.countries }}
           VISITOR_COUNT: ${{ github.event.inputs.total_visitors }}
-          MAX_MB: ${{ github.event.inputs.max_mb }}
-          SESSION_MINUTES: ${{ github.event.inputs.session_minutes }}
         run: node index.js
 
-      - name: Upload Screenshots
+      - name: Upload evidence
+        if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: bot-screenshots
-          path: screenshot_*.png
+          name: run-${{ github.run_id }}
+          path: |
+            screenshot_*.png
+            visitors.jsonl
+          retention-days: 7
+          if-no-files-found: ignore
